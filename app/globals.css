@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f1f4f7;
+  --color-ink: #13233a;
+  --color-sub: #5f6b7a;
+  --color-navy: #1f3a5f;
+  --color-mist: #c9d6e6;
+  --color-gold: #e3be6a;
+  --color-ok: #2e7d5b;
+  --color-warn: #b7791f;
+  --color-bad: #b4443c;
+  --color-bad-soft: #fbedeb;
+  --color-bad-ink: #7a2a24;
+  --color-line: rgb(19 35 58 / 0.08);
+  --color-line-strong: rgb(19 35 58 / 0.14);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", serif;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-navy);
+  outline-offset: 2px;
+}
