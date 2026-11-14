@@ -92,7 +92,7 @@ function Rates() {
 
 export default function RatesPage() {
   return (
-    <Portal role="admin" title="Hostel rates" back="/admin">
+    <Portal role="admin" title="Hostel rates" back="/admin/settings">
       {() => <Rates />}
     </Portal>
   );

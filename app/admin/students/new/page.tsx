@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { Portal } from "@/components/portal";
 import { ErrorNote, Field, PrimaryButton } from "@/components/ui";
 import { FeeForm } from "@/components/fee-form";
@@ -18,6 +19,7 @@ function NewStudent() {
   const [name, setName] = useState("");
   const [father, setFather] = useState("");
   const [roll, setRoll] = useState("");
+  const [phone, setPhone] = useState("");
   const [fee, setFee] = useState<FeeDraft>(emptyDraft);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,13 +40,14 @@ function NewStudent() {
     setError("");
     if (!name.trim()) return setError("Enter the student's name.");
     if (!classId) return setError("Choose a class.");
+    if (phone.trim() && !isValidPhone(phone)) return setError("The phone number should be 11 digits, like 0300 1234567.");
     const checked = readDraft(fee);
     if ("error" in checked) return setError(checked.error);
 
     setBusy(true);
     const { data: student, error: e1 } = await supabase
       .from("students")
-      .insert({ full_name: name.trim(), father_name: father.trim() || null, roll_no: roll.trim() || null, class_id: classId })
+      .insert({ full_name: name.trim(), father_name: father.trim() || null, roll_no: roll.trim() || null, class_id: classId, phone: phone.trim() ? normalizePhone(phone) : null })
       .select("id")
       .single();
     if (e1 || !student) {
@@ -85,6 +88,7 @@ function NewStudent() {
           </div>
           <Field label="Roll no" id="roll" value={roll} onChange={(e) => setRoll(e.target.value)} />
         </div>
+        <Field label="Parent's phone (WhatsApp)" id="phone" type="tel" inputMode="numeric" placeholder="0300 1234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-[28px] border border-line bg-white p-5">

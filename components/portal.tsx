@@ -19,8 +19,8 @@ export function Portal({ role, title, back, children }: { role: Role; title: str
   }
 
   return (
-    <main className="flex flex-1 flex-col px-5 pb-8 pt-12">
-      <header className="flex items-center justify-between gap-3">
+    <main className="flex flex-1 flex-col px-5 pb-8 pt-12 print:p-0">
+      <header className="flex items-center justify-between gap-3 print:hidden">
         {back && (
           <Link href={back} aria-label="Back" className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white hover:bg-bg">
             <ArrowLeft aria-hidden className="size-[18px]" strokeWidth={1.75} />

@@ -1,64 +1,88 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BedDouble, Users } from "lucide-react";
+import { GraduationCap, Settings, Users, Wallet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Portal } from "@/components/portal";
-import { ErrorNote, Field, PrimaryButton } from "@/components/ui";
+import { monthStart, rs } from "@/lib/fees";
+import { className, loadClasses, type ClassRow } from "@/lib/school";
 
-type ClassRow = { id: string; name: string; section: string };
+type Home = {
+  counts: { students: number; teachers: number; classes: number };
+  collection: { month: string; label: string; amount: number }[];
+  attendance: { cls: ClassRow; percent: number | null; marked: number }[];
+};
 
-async function fetchOverview() {
-  const [students, teachers, cls] = await Promise.all([
-    supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "active"),
+async function fetchHome(): Promise<Home> {
+  const from = monthStart(-5);
+  const today = new Date().toLocaleDateString("en-CA");
+  const [students, teachers, classes, payments, att] = await Promise.all([
+    supabase.from("students").select("id, class_id").eq("status", "active"),
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "teacher"),
-    supabase.from("classes").select("id, name, section").order("name").order("section"),
+    loadClasses(),
+    supabase.from("fee_payments").select("amount, paid_on").gte("paid_on", from),
+    supabase.from("daily_attendance").select("student_id, day_status").eq("held_on", today),
   ]);
+
+  const collection = Array.from({ length: 6 }, (_, i) => {
+    const m = monthStart(i - 5);
+    const [y, mo] = m.split("-").map(Number);
+    return { month: m.slice(0, 7), label: new Date(y, mo - 1, 1).toLocaleDateString("en-GB", { month: "short" }), amount: 0 };
+  });
+  for (const p of payments.data ?? []) {
+    const row = collection.find((c) => c.month === String(p.paid_on).slice(0, 7));
+    if (row) row.amount += Number(p.amount);
+  }
+
+  const classOf = new Map((students.data ?? []).map((s) => [s.id, s.class_id]));
+  const tally = new Map<string, { counted: number; score: number }>();
+  for (const a of att.data ?? []) {
+    if (a.day_status === "leave") continue;
+    const c = classOf.get(a.student_id);
+    if (!c) continue;
+    const t = tally.get(c) ?? { counted: 0, score: 0 };
+    t.counted += 1;
+    t.score += a.day_status === "present" ? 1 : a.day_status === "partial" ? 0.5 : 0;
+    tally.set(c, t);
+  }
+  const attendance = classes.map((cls) => {
+    const t = tally.get(cls.id);
+    return { cls, marked: t?.counted ?? 0, percent: t && t.counted ? (t.score / t.counted) * 100 : null };
+  });
+
   return {
-    counts: { students: students.count ?? 0, teachers: teachers.count ?? 0 },
-    classes: (cls.data ?? []) as ClassRow[],
+    counts: { students: students.data?.length ?? 0, teachers: teachers.count ?? 0, classes: classes.length },
+    collection,
+    attendance,
   };
 }
 
+const SECTIONS = [
+  { href: "/admin/students", label: "Students", urdu: "طلبہ", Icon: GraduationCap },
+  { href: "/admin/fees", label: "Fees", urdu: "فیس", Icon: Wallet },
+  { href: "/admin/teachers", label: "Teachers", urdu: "اساتذہ", Icon: Users },
+  { href: "/admin/settings", label: "School setup", urdu: "ترتیبات", Icon: Settings },
+];
+
 function Overview() {
-  const [counts, setCounts] = useState({ students: 0, teachers: 0 });
-  const [classes, setClasses] = useState<ClassRow[]>([]);
-  const [name, setName] = useState("");
-  const [section, setSection] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [version, setVersion] = useState(0);
+  const [home, setHome] = useState<Home | null>(null);
 
   useEffect(() => {
     let active = true;
-    fetchOverview().then((data) => {
-      if (!active) return;
-      setCounts(data.counts);
-      setClasses(data.classes);
-    });
+    fetchHome().then((h) => active && setHome(h));
     return () => {
       active = false;
     };
-  }, [version]);
-
-  async function addClass(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (!name.trim()) return setError("Enter a class name, like Class 8.");
-    setBusy(true);
-    const { error } = await supabase.from("classes").insert({ name: name.trim(), section: section.trim().toUpperCase() });
-    setBusy(false);
-    if (error) return setError(error.code === "23505" ? "That class and section already exist." : "The class wasn't saved. Try again.");
-    setName("");
-    setSection("");
-    setVersion((v) => v + 1);
-  }
+  }, []);
 
   const stats = [
-    { label: "Students", value: counts.students },
-    { label: "Teachers", value: counts.teachers },
-    { label: "Classes", value: classes.length },
+    { label: "Students", value: home?.counts.students ?? 0 },
+    { label: "Teachers", value: home?.counts.teachers ?? 0 },
+    { label: "Classes", value: home?.counts.classes ?? 0 },
   ];
+  const max = Math.max(1, ...(home?.collection.map((c) => c.amount) ?? [1]));
+  const thisMonth = home?.collection.at(-1)?.amount ?? 0;
+  const marked = home?.attendance.filter((a) => a.marked > 0) ?? [];
 
   return (
     <>
@@ -71,47 +95,59 @@ function Overview() {
         ))}
       </section>
 
-      <nav aria-label="Sections" className="mt-4 grid grid-cols-2 gap-2">
-        {[
-          { href: "/admin/students", label: "Students", Icon: Users },
-          { href: "/admin/rates", label: "Hostel rates", Icon: BedDouble },
-        ].map(({ href, label, Icon }) => (
-          <Link key={href} href={href} className="flex h-14 items-center gap-3 rounded-3xl border border-line bg-white px-4 text-[15px] hover:bg-bg">
-            <Icon aria-hidden className="size-[18px] text-navy" strokeWidth={1.75} />
-            {label}
+      <nav aria-label="Sections" className="mt-3 grid grid-cols-2 gap-2">
+        {SECTIONS.map(({ href, label, urdu, Icon }) => (
+          <Link key={href} href={href} className="flex items-center gap-3 rounded-3xl border border-line bg-white px-4 py-3 hover:bg-bg">
+            <span className="flex size-10 items-center justify-center rounded-full bg-bg">
+              <Icon aria-hidden className="size-[18px] text-navy" strokeWidth={1.75} />
+            </span>
+            <span className="flex flex-col">
+              <span className="text-[15px]">{label}</span>
+              <span lang="ur" dir="rtl" className="font-urdu text-xs leading-[2] text-sub">
+                {urdu}
+              </span>
+            </span>
           </Link>
         ))}
       </nav>
 
-      <h2 className="mt-6 text-base font-medium">Classes</h2>
-      <div className="mt-3 rounded-3xl border border-line bg-white px-4 py-1">
-        {classes.length === 0 ? (
-          <p className="py-4 text-sm leading-relaxed text-sub">Start by adding your classes below. Teachers and students come next.</p>
+      <Link href="/admin/fees" className="mt-4 block rounded-[28px] bg-navy p-5 text-white">
+        <p className="text-sm text-mist">Fee collected this month</p>
+        <p className="mt-1 text-[34px] font-medium leading-none tracking-tight tabular-nums">{rs(thisMonth)}</p>
+        <div className="mt-5 flex h-28 items-end gap-2" role="img" aria-label="Fee collected in each of the last six months">
+          {(home?.collection ?? []).map((c, i, all) => (
+            <div key={c.month} className="flex flex-1 flex-col items-center gap-2">
+              <div
+                className={`w-full rounded-t-lg ${i === all.length - 1 ? "bg-gold" : "bg-white/25"}`}
+                style={{ height: `${Math.max(4, (c.amount / max) * 88)}px` }}
+                title={rs(c.amount)}
+              />
+              <span className="text-xs text-mist">{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </Link>
+
+      <section className="mt-4 rounded-[28px] border border-line bg-white p-5">
+        <h2 className="text-base font-medium">Attendance today</h2>
+        {marked.length === 0 ? (
+          <p className="mt-2 text-sm text-sub">Not marked yet today. It shows here once teachers mark attendance.</p>
         ) : (
-          <ul>
-            {classes.map((c) => (
-              <li key={c.id} className="flex h-14 items-center justify-between border-b border-line last:border-b-0">
-                <span className="text-[15px]">
-                  {c.name}
-                  {c.section ? `-${c.section}` : ""}
-                </span>
+          <ul className="mt-3 flex flex-col gap-3">
+            {marked.map((a) => (
+              <li key={a.cls.id} className="flex flex-col gap-1.5">
+                <div className="flex justify-between text-sm">
+                  <span>{className(a.cls)}</span>
+                  <span className={`font-medium tabular-nums ${(a.percent ?? 0) >= 85 ? "text-ok" : (a.percent ?? 0) >= 70 ? "text-warn" : "text-bad"}`}>{Math.round(a.percent ?? 0)}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-bg">
+                  <div className="h-full rounded-full bg-navy" style={{ width: `${Math.round(a.percent ?? 0)}%` }} />
+                </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
-
-      <h2 className="mt-6 text-base font-medium">Add a class</h2>
-      <form onSubmit={addClass} noValidate className="mt-3 flex flex-col gap-4 rounded-[28px] border border-line bg-white p-5">
-        <div className="grid grid-cols-[1fr_96px] gap-3">
-          <Field label="Class name" id="class_name" placeholder="Class 8" value={name} onChange={(e) => setName(e.target.value)} />
-          <Field label="Section" id="class_section" placeholder="A" maxLength={3} value={section} onChange={(e) => setSection(e.target.value)} />
-        </div>
-        <ErrorNote>{error}</ErrorNote>
-        <PrimaryButton type="submit" busy={busy}>
-          Add class
-        </PrimaryButton>
-      </form>
+      </section>
     </>
   );
 }
