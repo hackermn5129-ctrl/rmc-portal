@@ -1,13 +1,14 @@
 "use client";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, LogOut } from "lucide-react";
 import { supabase, type Profile, type Role } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 
 const ROLE_LABEL: Record<Role, string> = { admin: "Principal", teacher: "Teacher", student: "Student", parent: "Parent" };
 
-export function Portal({ role, title, children }: { role: Role; title: string; children: (profile: Profile) => ReactNode }) {
+export function Portal({ role, title, back, children }: { role: Role; title: string; back?: string; children: (profile: Profile) => ReactNode }) {
   const router = useRouter();
   const { profile, loading } = useProfile(role);
   if (loading || !profile) return <p className="m-auto text-sm text-sub">Opening your portal</p>;
@@ -20,7 +21,12 @@ export function Portal({ role, title, children }: { role: Role; title: string; c
   return (
     <main className="flex flex-1 flex-col px-5 pb-8 pt-12">
       <header className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
+        {back && (
+          <Link href={back} aria-label="Back" className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white hover:bg-bg">
+            <ArrowLeft aria-hidden className="size-[18px]" strokeWidth={1.75} />
+          </Link>
+        )}
+        <div className="flex flex-1 flex-col gap-0.5">
           <h1 className="text-[22px] font-medium tracking-tight">{title}</h1>
           <p className="text-sm text-sub">
             {profile.full_name} · {ROLE_LABEL[profile.role]}

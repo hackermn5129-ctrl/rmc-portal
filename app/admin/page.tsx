@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { BedDouble, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Portal } from "@/components/portal";
 import { ErrorNote, Field, PrimaryButton } from "@/components/ui";
@@ -68,6 +70,18 @@ function Overview() {
           </div>
         ))}
       </section>
+
+      <nav aria-label="Sections" className="mt-4 grid grid-cols-2 gap-2">
+        {[
+          { href: "/admin/students", label: "Students", Icon: Users },
+          { href: "/admin/rates", label: "Hostel rates", Icon: BedDouble },
+        ].map(({ href, label, Icon }) => (
+          <Link key={href} href={href} className="flex h-14 items-center gap-3 rounded-3xl border border-line bg-white px-4 text-[15px] hover:bg-bg">
+            <Icon aria-hidden className="size-[18px] text-navy" strokeWidth={1.75} />
+            {label}
+          </Link>
+        ))}
+      </nav>
 
       <h2 className="mt-6 text-base font-medium">Classes</h2>
       <div className="mt-3 rounded-3xl border border-line bg-white px-4 py-1">
