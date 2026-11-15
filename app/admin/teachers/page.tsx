@@ -26,13 +26,20 @@ function Teachers() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
+  const [teaches, setTeaches] = useState<{ teacher_id: string; class_id: string }[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    Promise.all([supabase.from("profiles").select("id, full_name, phone").eq("role", "teacher").order("full_name"), loadClasses()]).then(([t, c]) => {
+    Promise.all([
+      supabase.from("profiles").select("id, full_name, phone").eq("role", "teacher").order("full_name"),
+      loadClasses(),
+      supabase.from("teacher_classes").select("teacher_id, class_id"),
+    ]).then(([t, c, tc]) => {
       if (!active) return;
       setTeachers((t.data ?? []) as Teacher[]);
       setClasses(c);
+      setTeaches(tc.data ?? []);
     });
     return () => {
       active = false;
@@ -61,6 +68,12 @@ function Teachers() {
     setVersion((v) => v + 1);
   }
 
+  async function toggleTeaches(teacherId: string, classId: string, on: boolean) {
+    if (on) await supabase.from("teacher_classes").delete().eq("teacher_id", teacherId).eq("class_id", classId);
+    else await supabase.from("teacher_classes").insert({ teacher_id: teacherId, class_id: classId });
+    setVersion((v) => v + 1);
+  }
+
   const classOf = (id: string) => classes.filter((c) => c.class_teacher_id === id).map(className).join(", ");
 
   return (
@@ -71,12 +84,39 @@ function Teachers() {
         ) : (
           <ul>
             {teachers.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 border-b border-line py-3 last:border-b-0">
-                <span className="flex flex-col">
-                  <span className="text-[15px]">{t.full_name}</span>
-                  <span className="text-sm text-sub tabular-nums">{t.phone}</span>
-                </span>
-                <span className="text-sm text-sub">{classOf(t.id) || "No class"}</span>
+              <li key={t.id} className="border-b border-line py-3 last:border-b-0">
+                <button type="button" onClick={() => setOpen(open === t.id ? null : t.id)} aria-expanded={open === t.id} className="flex w-full items-center justify-between gap-3 text-left">
+                  <span className="flex flex-col">
+                    <span className="text-[15px]">{t.full_name}</span>
+                    <span className="text-sm text-sub tabular-nums">{t.phone}</span>
+                  </span>
+                  <span className="text-right text-sm text-sub">
+                    {classOf(t.id) ? `Class teacher: ${classOf(t.id)}` : "No class"}
+                    <br />
+                    Teaches {teaches.filter((x) => x.teacher_id === t.id).length} classes
+                  </span>
+                </button>
+                {open === t.id && (
+                  <div className="mt-3">
+                    <p className="text-sm text-sub">Teaches in (tap to change)</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {classes.map((c) => {
+                        const on = teaches.some((x) => x.teacher_id === t.id && x.class_id === c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => toggleTeaches(t.id, c.id, on)}
+                            className={`rounded-full border px-3 py-1.5 text-sm ${on ? "border-navy bg-navy text-white" : "border-line-strong bg-bg"}`}
+                          >
+                            {className(c)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
