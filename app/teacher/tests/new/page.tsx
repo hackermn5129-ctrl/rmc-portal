@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { Portal } from "@/components/portal";
 import { ErrorNote, Field, PrimaryButton, SelectField } from "@/components/ui";
 import { className, currentSession, type Session, type TestKind } from "@/lib/school";
-import { loadMyClasses, loadSubjects, todayIso, type MyClass } from "@/lib/teacher";
+import { loadMyClasses, todayIso, type MyClass } from "@/lib/teacher";
 
 const KINDS: { value: TestKind; label: string; urdu: string; note: string }[] = [
   { value: "daily", label: "Daily", urdu: "روزانہ", note: "Least weight" },
@@ -16,7 +16,6 @@ const KINDS: { value: TestKind; label: string; urdu: string; note: string }[] = 
 function NewTest({ teacherId }: { teacherId: string }) {
   const router = useRouter();
   const [classes, setClasses] = useState<MyClass[]>([]);
-  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [f, setF] = useState({ class_id: "", subject_id: "", kind: "weekly" as TestKind, title: "", held_on: todayIso(), total_marks: "" });
   const [error, setError] = useState("");
@@ -24,12 +23,12 @@ function NewTest({ teacherId }: { teacherId: string }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([loadMyClasses(teacherId), loadSubjects(), currentSession()]).then(([c, s, sess]) => {
+    Promise.all([loadMyClasses(teacherId), currentSession()]).then(([all, sess]) => {
       if (!active) return;
+      const c = all.filter((x) => x.subjects.length > 0);
       setClasses(c);
-      setSubjects(s);
       setSession(sess);
-      if (c.length === 1) setF((x) => ({ ...x, class_id: c[0].id }));
+      if (c.length === 1) setF((x) => ({ ...x, class_id: c[0].id, subject_id: c[0].subjects.length === 1 ? c[0].subjects[0].id : "" }));
     });
     return () => {
       active = false;
@@ -38,6 +37,8 @@ function NewTest({ teacherId }: { teacherId: string }) {
 
   if (session === undefined) return <p className="mt-6 text-sm text-sub">Loading</p>;
   if (!session) return <p className="mt-6 text-sm text-sub">The principal has not set the academic session yet.</p>;
+  if (classes.length === 0) return <p className="mt-6 text-sm text-sub">No subjects are given to you yet. The principal adds them in Teachers.</p>;
+  const subjects = classes.find((c) => c.id === f.class_id)?.subjects ?? [];
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -91,7 +92,10 @@ function NewTest({ teacherId }: { teacherId: string }) {
         </div>
       </fieldset>
       <div className="grid grid-cols-2 gap-3">
-        <SelectField label="Class" id="cls" value={f.class_id} onChange={(e) => setF({ ...f, class_id: e.target.value })}>
+        <SelectField label="Class" id="cls" value={f.class_id} onChange={(e) => {
+            const subs = classes.find((c) => c.id === e.target.value)?.subjects ?? [];
+            setF({ ...f, class_id: e.target.value, subject_id: subs.length === 1 ? subs[0].id : "" });
+          }}>
           <option value="">Choose</option>
           {classes.map((c) => (
             <option key={c.id} value={c.id}>
@@ -123,7 +127,7 @@ function NewTest({ teacherId }: { teacherId: string }) {
 
 export default function NewTestPage() {
   return (
-    <Portal role="teacher" title="Test taken" back="/teacher/tests">
+    <Portal role={["teacher", "admin"]} title="Test taken" back="/teacher/tests">
       {(p) => <NewTest teacherId={p.id} />}
     </Portal>
   );

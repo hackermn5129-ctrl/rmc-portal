@@ -16,19 +16,36 @@ export const STATUSES: { value: AttendanceStatus; label: string; short: string; 
   { value: "leave", label: "Leave", short: "Lv", on: "bg-navy text-white border-navy" },
 ];
 
-export type MyClass = ClassRow & { isClassTeacher: boolean };
+export type MyClass = ClassRow & {
+  isClassIncharge: boolean; // marks attendance
+  isFeeIncharge: boolean; // sees who has not paid
+  subjects: { id: string; name: string }[]; // enters test marks for these
+};
 
-// Classes this teacher teaches, plus the one they are class teacher of.
+// Every class this teacher has a job in, with what that job is.
 export async function loadMyClasses(teacherId: string): Promise<MyClass[]> {
-  const [tc, cls] = await Promise.all([
-    supabase.from("teacher_classes").select("class_id").eq("teacher_id", teacherId),
-    supabase.from("classes").select("id, name, section, class_teacher_id"),
+  const [ts, cls] = await Promise.all([
+    supabase.from("teacher_subjects").select("class_id, subjects(id, name)").eq("teacher_id", teacherId),
+    supabase.from("classes").select("id, name, section, class_teacher_id, fee_incharge_id"),
   ]);
-  const mine = new Set((tc.data ?? []).map((r) => r.class_id));
-  const rows = ((cls.data ?? []) as ClassRow[])
-    .filter((c) => mine.has(c.id) || c.class_teacher_id === teacherId)
-    .map((c) => ({ ...c, isClassTeacher: c.class_teacher_id === teacherId }));
+  const subs = new Map<string, { id: string; name: string }[]>();
+  for (const r of (ts.data ?? []) as unknown as { class_id: string; subjects: { id: string; name: string } | null }[]) {
+    if (!r.subjects) continue;
+    subs.set(r.class_id, [...(subs.get(r.class_id) ?? []), r.subjects].sort((a, b) => a.name.localeCompare(b.name)));
+  }
+  const rows = ((cls.data ?? []) as (ClassRow & { fee_incharge_id: string | null })[])
+    .map((c) => ({
+      ...c,
+      isClassIncharge: c.class_teacher_id === teacherId,
+      isFeeIncharge: c.fee_incharge_id === teacherId,
+      subjects: subs.get(c.id) ?? [],
+    }))
+    .filter((c) => c.isClassIncharge || c.isFeeIncharge || c.subjects.length > 0);
   return sortClasses(rows);
+}
+
+export function jobsLabel(c: MyClass): string {
+  return [c.isClassIncharge && "class incharge", c.isFeeIncharge && "fee incharge"].filter(Boolean).join(", ");
 }
 
 export async function loadSubjects() {

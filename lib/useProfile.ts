@@ -5,7 +5,7 @@ import { supabase, type Profile, type Role } from "./supabase";
 
 // Loads the signed-in person's profile. Sends them to /login when signed out,
 // and to their own home when they open a page meant for another role.
-export function useProfile(required?: Role) {
+export function useProfile(required?: Role | Role[]) {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +29,8 @@ export function useProfile(required?: Role) {
         router.replace("/login");
         return;
       }
-      if (required && data.role !== required) {
+      const allowed = required === undefined ? null : Array.isArray(required) ? required : [required];
+      if (allowed && !allowed.includes(data.role)) {
         router.replace(`/${data.role}`);
         return;
       }
@@ -39,7 +40,8 @@ export function useProfile(required?: Role) {
     return () => {
       active = false;
     };
-  }, [required, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [String(required), router]);
 
   return { profile, loading };
 }

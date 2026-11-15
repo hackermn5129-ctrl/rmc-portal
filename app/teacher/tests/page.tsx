@@ -20,7 +20,8 @@ function Tests({ teacherId }: { teacherId: string }) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const [mine, session] = await Promise.all([loadMyClasses(teacherId), currentSession()]);
+      const [all, session] = await Promise.all([loadMyClasses(teacherId), currentSession()]);
+      const mine = all.filter((c) => c.subjects.length > 0);
       const ids = mine.map((c) => c.id);
       if (!ids.length) {
         if (active) setRows([]);
@@ -28,7 +29,7 @@ function Tests({ teacherId }: { teacherId: string }) {
       }
       let q = supabase
         .from("tests")
-        .select("id, title, kind, held_on, total_marks, class_id, subjects(name), results(count)")
+        .select("id, title, kind, held_on, total_marks, class_id, subject_id, subjects(name), results(count)")
         .in("class_id", ids)
         .order("held_on", { ascending: false })
         .limit(60);
@@ -38,7 +39,8 @@ function Tests({ teacherId }: { teacherId: string }) {
       for (const s of st.data ?? []) count.set(s.class_id, (count.get(s.class_id) ?? 0) + 1);
       if (!active) return;
       setClasses(mine);
-      setRows((t.data ?? []) as unknown as Row[]);
+      const own = new Set(mine.flatMap((c) => c.subjects.map((sub) => `${c.id}|${sub.id}`)));
+      setRows(((t.data ?? []) as unknown as (Row & { subject_id: string })[]).filter((r) => own.has(`${r.class_id}|${r.subject_id}`)));
       setSizes(count);
     })();
     return () => {
@@ -92,7 +94,7 @@ function Tests({ teacherId }: { teacherId: string }) {
 
 export default function TestsPage() {
   return (
-    <Portal role="teacher" title="Tests and results" back="/teacher">
+    <Portal role={["teacher", "admin"]} title="Tests and results" back="/teacher">
       {(p) => <Tests teacherId={p.id} />}
     </Portal>
   );

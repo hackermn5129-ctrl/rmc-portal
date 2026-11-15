@@ -60,7 +60,7 @@ export function Portal({
   back,
   children,
 }: {
-  role: Role;
+  role: Role | Role[];
   /** A function is worked out only after sign-in, in the browser (e.g. for today's month). */
   title: string | (() => string);
   subtitle?: string;

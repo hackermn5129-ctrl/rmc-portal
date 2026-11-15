@@ -36,8 +36,9 @@ function Attendance({ teacherId }: { teacherId: string }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([loadMyClasses(teacherId), loadSubjects(), currentSession()]).then(([c, s, sess]) => {
+    Promise.all([loadMyClasses(teacherId), loadSubjects(), currentSession()]).then(([all, s, sess]) => {
       if (!active) return;
+      const c = all.filter((x) => x.isClassIncharge);
       setClasses(c);
       setSubjects(s);
       setSession(sess);
@@ -91,7 +92,7 @@ function Attendance({ teacherId }: { teacherId: string }) {
 
   if (session === undefined) return <p className="mt-6 text-sm text-sub">Loading</p>;
   if (!session) return <p className="mt-6 text-sm text-sub">The principal has not set the academic session yet.</p>;
-  if (classes.length === 0) return <p className="mt-6 text-sm text-sub">No classes are assigned to you yet.</p>;
+  if (classes.length === 0) return <p className="mt-6 text-sm text-sub">Only the class incharge marks attendance. You are not class incharge of any class.</p>;
 
   async function save() {
     setError("");

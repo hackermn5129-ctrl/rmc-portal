@@ -146,7 +146,7 @@ function Marks({ testId, teacherId }: { testId: string; teacherId: string }) {
 
 export default function MarksPage() {
   return (
-    <Portal role="teacher" title="Enter marks" back="/teacher/tests">
+    <Portal role={["teacher", "admin"]} title="Enter marks" back="/teacher/tests">
       {(p) => <WithId render={(id) => <Marks testId={id} teacherId={p.id} />} />}
     </Portal>
   );
