@@ -5,6 +5,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 //   status:    tells the login page whether the first admin still has to be made.
 //   bootstrap: makes the first admin. Needs the one-time setup code and only works while no admin exists.
 //   create:    makes any other account. Only a signed-in admin can call it.
+//              With student_id it also links the account: a parent to that child (an existing
+//              parent account with the same phone is linked instead of making a second one),
+//              or a student login to that student record.
+//   reset:     sets a new password for an account. Only a signed-in admin can call it.
 
 const LOGIN_DOMAIN = "users.rmc-portal.app";
 // Fingerprint (SHA-256) of the one-time setup code. It is kept out of this public file on purpose:
@@ -63,6 +67,26 @@ Deno.serve(async (req: Request) => {
   const action = body.action;
   if (action === "status") return json({ needs_setup: adminCount === 0 });
 
+  async function callerIsAdmin(): Promise<boolean> {
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: caller } = await admin.auth.getUser(token);
+    if (!caller?.user) return false;
+    const { data: p } = await admin.from("profiles").select("role").eq("id", caller.user.id).maybeSingle();
+    return p?.role === "admin";
+  }
+
+  if (action === "reset") {
+    if (!(await callerIsAdmin())) return json({ error: "Only the admin can reset passwords." }, 403);
+    const userId = String(body.user_id ?? "");
+    const password = String(body.password ?? "");
+    if (password.length < 8) return json({ error: "Use a password with at least 8 characters." }, 400);
+    const { data: target } = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
+    if (!target) return json({ error: "That account wasn't found." }, 404);
+    const { error } = await admin.auth.admin.updateUserById(userId, { password });
+    if (error) return json({ error: "The password wasn't changed. Try again." }, 500);
+    return json({ ok: true });
+  }
+
   let role: string;
   if (action === "bootstrap") {
     if (adminCount !== 0) return json({ error: "Setup is already done. Sign in instead." }, 409);
@@ -71,15 +95,18 @@ Deno.serve(async (req: Request) => {
     if (!sameText(given, SETUP_CODE_SHA256)) return json({ error: "That setup code isn't right." }, 403);
     role = "admin";
   } else if (action === "create") {
-    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-    const { data: caller } = await admin.auth.getUser(token);
-    if (!caller?.user) return json({ error: "Sign in first." }, 401);
-    const { data: callerProfile } = await admin.from("profiles").select("role").eq("id", caller.user.id).maybeSingle();
-    if (callerProfile?.role !== "admin") return json({ error: "Only the admin can add accounts." }, 403);
+    if (!(await callerIsAdmin())) return json({ error: "Only the admin can add accounts." }, 403);
     role = String(body.role ?? "");
     if (!ROLES.includes(role)) return json({ error: "Pick a valid role." }, 400);
   } else {
     return json({ error: "Unknown action." }, 400);
+  }
+
+  const studentId = body.student_id ? String(body.student_id) : null;
+  if (studentId) {
+    const { data: st } = await admin.from("students").select("id, profile_id").eq("id", studentId).maybeSingle();
+    if (!st) return json({ error: "That student wasn't found." }, 404);
+    if (role === "student" && st.profile_id) return json({ error: "This student already has a login." }, 409);
   }
 
   const fullName = String(body.full_name ?? "").trim();
@@ -87,6 +114,15 @@ Deno.serve(async (req: Request) => {
   const password = String(body.password ?? "");
   if (fullName.length < 3) return json({ error: "Enter the full name." }, 400);
   if (!/^03\d{9}$/.test(phone)) return json({ error: "Enter an 11-digit mobile number, like 0300 1234567." }, 400);
+
+  if (role === "parent" && studentId) {
+    const { data: existing } = await admin.from("profiles").select("id, role").eq("phone", phone).maybeSingle();
+    if (existing) {
+      if (existing.role !== "parent") return json({ error: "That phone number belongs to a staff or student account." }, 409);
+      await admin.from("parent_students").upsert({ parent_id: existing.id, student_id: studentId }, { onConflict: "parent_id,student_id", ignoreDuplicates: true });
+      return json({ ok: true, id: existing.id, role, linked_existing: true });
+    }
+  }
   if (password.length < 8) return json({ error: "Use a password with at least 8 characters." }, 400);
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -105,6 +141,9 @@ Deno.serve(async (req: Request) => {
     await admin.auth.admin.deleteUser(created.user.id);
     return json({ error: "The account wasn't saved. Try again." }, 500);
   }
+
+  if (studentId && role === "parent") await admin.from("parent_students").insert({ parent_id: created.user.id, student_id: studentId });
+  if (studentId && role === "student") await admin.from("students").update({ profile_id: created.user.id }).eq("id", studentId);
 
   return json({ ok: true, id: created.user.id, role });
 });

@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { BedDouble, ChevronRight } from "lucide-react";
+import { BedDouble, ChevronRight, Megaphone, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { Portal } from "@/components/portal";
+import { Portal, SignOutButton } from "@/components/portal";
 import { ErrorNote, Field, OkNote, PrimaryButton } from "@/components/ui";
 import { className, loadClasses, type ClassRow, type Session } from "@/lib/school";
 
@@ -200,16 +200,34 @@ export default function SettingsPage() {
     <Portal role="admin" title="School setup" back="/admin">
       {() => (
         <>
-          <Link href="/admin/rates" className="mt-5 flex h-14 items-center justify-between rounded-3xl border border-line bg-white px-4 text-[15px] hover:bg-bg">
-            <span className="flex items-center gap-3">
-              <BedDouble aria-hidden className="size-[18px] text-navy" strokeWidth={1.75} />
-              Hostel rates
-            </span>
-            <ChevronRight aria-hidden className="size-[18px] text-sub" strokeWidth={1.75} />
-          </Link>
+          <ul className="mt-5 rounded-3xl border border-line bg-white px-4 py-1">
+            {[
+              { href: "/admin/notices", label: "Notices", note: "Send news to parents, students or teachers", Icon: Megaphone },
+              { href: "/admin/promote", label: "Promote students", note: "Move everyone up at the end of a session", Icon: TrendingUp },
+              { href: "/admin/rates", label: "Hostel rates", note: "Rent and mess for each hostel type", Icon: BedDouble },
+            ].map(({ href, label, note, Icon }) => (
+              <li key={href} className="border-b border-line last:border-b-0">
+                <Link href={href} className="flex items-center justify-between gap-3 py-3">
+                  <span className="flex items-center gap-3">
+                    <span className="flex size-10 items-center justify-center rounded-full bg-bg">
+                      <Icon aria-hidden className="size-[18px] text-navy" strokeWidth={1.75} />
+                    </span>
+                    <span className="flex flex-col">
+                      <span className="text-[15px]">{label}</span>
+                      <span className="text-sm text-sub">{note}</span>
+                    </span>
+                  </span>
+                  <ChevronRight aria-hidden className="size-[18px] text-sub" strokeWidth={1.75} />
+                </Link>
+              </li>
+            ))}
+          </ul>
           <Sessions />
           <Subjects />
           <Classes />
+          <div className="mt-6">
+            <SignOutButton />
+          </div>
         </>
       )}
     </Portal>

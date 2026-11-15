@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { isValidPhone } from "@/lib/phone";
 import { Portal } from "@/components/portal";
+import { ResetPassword } from "@/components/student-extras";
 import { ErrorNote, Field, OkNote, PrimaryButton } from "@/components/ui";
 import { className, loadClasses, type ClassRow } from "@/lib/school";
 
@@ -98,6 +99,9 @@ function Teachers() {
                 </button>
                 {open === t.id && (
                   <div className="mt-3">
+                    <div className="mb-3">
+                      <ResetPassword userId={t.id} name={t.full_name} />
+                    </div>
                     <p className="text-sm text-sub">Teaches in (tap to change)</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {classes.map((c) => {

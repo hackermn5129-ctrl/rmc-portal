@@ -12,6 +12,7 @@ import { draftFromPlan, emptyDraft, monthLabel, monthStart, readDraft, residence
 import { KIND_LABEL, className, loadClasses, pct, toneFor, type ClassRow, type TestKind } from "@/lib/school";
 import { loadResults, studentPercent, subjectPercent, subjectsWithTests, type ResultsData } from "@/lib/results";
 import type { Balance } from "@/lib/fee-data";
+import { AttendanceSummary, Logins } from "@/components/student-extras";
 
 type Student = {
   id: string;
@@ -22,6 +23,7 @@ type Student = {
   admission_date: string;
   class_id: string | null;
   status: "active" | "left";
+  profile_id: string | null;
 };
 type Receipt = { receipt_no: number; paid_on: string; amount: number };
 
@@ -234,7 +236,7 @@ function Profile({ id }: { id: string }) {
     (async () => {
       await supabase.rpc("generate_fee_records", { p_month: monthStart() });
       const [s, c, p, r, b, pay, res] = await Promise.all([
-        supabase.from("students").select("id, full_name, father_name, roll_no, phone, admission_date, class_id, status").eq("id", id).maybeSingle(),
+        supabase.from("students").select("id, full_name, father_name, roll_no, phone, admission_date, class_id, status, profile_id").eq("id", id).maybeSingle(),
         loadClasses(),
         supabase.from("student_fee_plans").select("*").eq("student_id", id).order("effective_from", { ascending: false }),
         supabase.from("hostel_rates").select("residence, monthly_rent, mess_fee"),
@@ -310,6 +312,8 @@ function Profile({ id }: { id: string }) {
         )}
       </section>
 
+      <AttendanceSummary studentId={id} />
+
       {results && <Results data={results} studentId={id} />}
 
       <section className="mt-4 rounded-[28px] bg-navy p-5 text-white">
@@ -363,6 +367,8 @@ function Profile({ id }: { id: string }) {
           </ul>
         </Card>
       )}
+
+      <Logins key={`l${version}`} student={student} profileId={student.profile_id} />
 
       {plans.length > 1 && (
         <Card title="Fee history">
