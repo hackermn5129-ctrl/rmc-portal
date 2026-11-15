@@ -28,3 +28,17 @@ export function WithQuery({ name, render }: { name: string; render: (value: stri
     </Suspense>
   );
 }
+
+function ParamsInner({ render }: { render: (p: URLSearchParams) => ReactNode }) {
+  const params = useSearchParams();
+  return <>{render(new URLSearchParams(params.toString()))}</>;
+}
+
+// Reads every ?name=value from the address (Suspense-wrapped).
+export function WithParams({ render }: { render: (p: URLSearchParams) => ReactNode }) {
+  return (
+    <Suspense>
+      <ParamsInner render={render} />
+    </Suspense>
+  );
+}

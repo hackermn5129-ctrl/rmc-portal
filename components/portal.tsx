@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarCheck, ChartColumn, GraduationCap, House, ListChecks, LogOut, PlayCircle, Settings, Users, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Library, ChartColumn, GraduationCap, House, ListChecks, LogOut, PlayCircle, Settings, Users, Wallet } from "lucide-react";
 import { supabase, type Profile, type Role } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 
@@ -35,6 +35,7 @@ const familyNav = (base: string) =>
         { href: base, label: "Home", Icon: House, match: (p: string) => p === base },
         { href: `${base}/tests`, label: "Tests", Icon: ListChecks, match: (p: string) => p.startsWith(`${base}/tests`) },
         { href: `${base}/lectures`, label: "Lectures", Icon: PlayCircle, match: (p: string) => p.startsWith(`${base}/lectures`) },
+        { href: `${base}/resources`, label: "Resources", Icon: Library, match: (p: string) => p.startsWith(`${base}/resources`) },
         { href: `${base}/progress`, label: "Progress", Icon: ChartColumn, match: (p: string) => p.startsWith(`${base}/progress`) },
       ]
     : [
@@ -46,10 +47,11 @@ const familyNav = (base: string) =>
 
 function FamilyNav({ base }: { base: string }) {
   const path = usePathname();
+  const items = familyNav(base);
   return (
     <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[430px] px-5 pb-4 print:hidden">
-      <div className="grid grid-cols-4 gap-1 rounded-[32px] border border-line bg-white p-2 shadow-[0_8px_24px_rgba(19,35,58,0.08)]">
-        {familyNav(base).map(({ href, label, Icon, match }) => {
+      <div className={`grid ${items.length > 4 ? "grid-cols-5" : "grid-cols-4"} gap-1 rounded-[32px] border border-line bg-white p-2 shadow-[0_8px_24px_rgba(19,35,58,0.08)]`}>
+        {items.map(({ href, label, Icon, match }) => {
           const on = match(path);
           return (
             <Link
