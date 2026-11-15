@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, GraduationCap, House, LogOut, Settings, Users, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarCheck, ChartColumn, GraduationCap, House, LogOut, Settings, Users, Wallet } from "lucide-react";
 import { supabase, type Profile, type Role } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 
@@ -28,6 +28,37 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join("") || "?";
+
+const familyNav = (base: string) => [
+  { href: base, label: "Home", Icon: House, match: (p: string) => p === base },
+  { href: `${base}/attendance`, label: "Attendance", Icon: CalendarCheck, match: (p: string) => p.startsWith(`${base}/attendance`) },
+  { href: `${base}/progress`, label: "Progress", Icon: ChartColumn, match: (p: string) => p.startsWith(`${base}/progress`) },
+  { href: `${base}/fees`, label: "Fees", Icon: Wallet, match: (p: string) => p.startsWith(`${base}/fees`) },
+];
+
+function FamilyNav({ base }: { base: string }) {
+  const path = usePathname();
+  return (
+    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[430px] px-5 pb-4 print:hidden">
+      <div className="grid grid-cols-4 gap-1 rounded-[32px] border border-line bg-white p-2 shadow-[0_8px_24px_rgba(19,35,58,0.08)]">
+        {familyNav(base).map(({ href, label, Icon, match }) => {
+          const on = match(path);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={on ? "page" : undefined}
+              className={`flex h-[52px] flex-col items-center justify-center gap-0.5 rounded-3xl text-xs ${on ? "bg-navy font-medium text-white" : "text-sub hover:bg-bg"}`}
+            >
+              <Icon aria-hidden className="size-[18px]" strokeWidth={1.75} />
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
 
 function AdminNav() {
   const path = usePathname();
@@ -62,8 +93,8 @@ export function Portal({
 }: {
   role: Role | Role[];
   /** A function is worked out only after sign-in, in the browser (e.g. for today's month). */
-  title: string | (() => string);
-  subtitle?: string;
+  title: string | ((profile: Profile) => ReactNode);
+  subtitle?: string | ((profile: Profile) => ReactNode);
   back?: string;
   children: (profile: Profile) => ReactNode;
 }) {
@@ -77,9 +108,10 @@ export function Portal({
   }
 
   const isAdmin = profile.role === "admin";
+  const family = profile.role === "student" || profile.role === "parent" ? `/${profile.role}` : null;
 
   return (
-    <main className={`flex flex-1 flex-col px-5 pt-12 print:p-0 ${isAdmin ? "pb-32" : "pb-8"}`}>
+    <main className={`flex flex-1 flex-col px-5 pt-12 print:p-0 ${isAdmin || family ? "pb-32" : "pb-8"}`}>
       <header className="flex items-center justify-between gap-3 print:hidden">
         {back && (
           <Link href={back} aria-label="Back" className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white hover:bg-bg">
@@ -87,10 +119,18 @@ export function Portal({
           </Link>
         )}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h1 className="truncate text-[22px] font-medium tracking-tight">{typeof title === "function" ? title() : title}</h1>
-          <p className="truncate text-sm text-sub">{subtitle ?? `${profile.full_name} · ${ROLE_LABEL[profile.role]}`}</p>
+          <h1 className="truncate text-[22px] font-medium tracking-tight">{typeof title === "function" ? title(profile) : title}</h1>
+          <p className="truncate text-sm text-sub">{typeof subtitle === "function" ? subtitle(profile) : subtitle ?? `${profile.full_name} · ${ROLE_LABEL[profile.role]}`}</p>
         </div>
-        {isAdmin ? (
+        {family ? (
+          <Link
+            href={`${family}/more`}
+            aria-label="Children, notices and sign out"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white text-sm font-medium hover:bg-bg"
+          >
+            {initials(profile.full_name)}
+          </Link>
+        ) : isAdmin ? (
           <Link
             href="/admin/settings"
             aria-label="Profile and school setup"
@@ -106,6 +146,7 @@ export function Portal({
       </header>
       {children(profile)}
       {isAdmin && <AdminNav />}
+      {family && <FamilyNav base={family} />}
     </main>
   );
 }

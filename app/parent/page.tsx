@@ -1,10 +1,11 @@
 "use client";
-import { ComingSoon, Portal } from "@/components/portal";
+import { FamilyPage, classOf, today } from "@/components/family/shell";
+import { ParentHome } from "@/components/family/home";
 
 export default function Page() {
   return (
-    <Portal role="parent" title="Home">
-      {() => <ComingSoon what="Your child's attendance, marks and fees" />}
-    </Portal>
+    <FamilyPage role="parent" title={(c) => c.full_name} subtitle={(c) => `${classOf(c)} · ${today()}`}>
+      {(ctx) => <ParentHome {...ctx} />}
+    </FamilyPage>
   );
 }
