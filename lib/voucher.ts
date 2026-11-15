@@ -7,6 +7,7 @@ export type VoucherRead = {
   voucher_no: string;
   name_urdu: string;
   name_english: string;
+  name_alternatives?: string[];
   father_urdu: string;
   father_english: string;
   class_text: string;
@@ -29,8 +30,9 @@ export const voucherAmount = (v: VoucherRead) => v.total || v.annual_fund + v.ho
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 export const voucherMonths = (v: VoucherRead) => v.months.map((m) => MONTHS[m - 1]).join(", ") || v.month_text;
 
-// Makes the photo small enough to send (longest side 1600px) and turns it the right way up.
-export async function shrinkPhoto(file: File, longest = 1600): Promise<{ base64: string; preview: string }> {
+// Makes the photo small enough to send (longest side 1600px). The receipt is wide, and phone photos
+// of it are often taken sideways, so turned copies are sent too and the reader uses the upright one.
+export async function shrinkPhoto(file: File, longest = 1600): Promise<{ images: string[]; preview: string }> {
   let source: ImageBitmap | HTMLImageElement;
   try {
     source = await createImageBitmap(file, { imageOrientation: "from-image" });
@@ -43,16 +45,28 @@ export async function shrinkPhoto(file: File, longest = 1600): Promise<{ base64:
     });
   }
   const scale = Math.min(1, longest / Math.max(source.width, source.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(source.width * scale));
-  canvas.height = Math.max(1, Math.round(source.height * scale));
-  canvas.getContext("2d")!.drawImage(source, 0, 0, canvas.width, canvas.height);
-  const preview = canvas.toDataURL("image/jpeg", 0.85);
-  return { base64: preview.slice(preview.indexOf(",") + 1), preview };
+  const w = Math.max(1, Math.round(source.width * scale));
+  const h = Math.max(1, Math.round(source.height * scale));
+
+  const turned = (quarterTurns: number) => {
+    const canvas = document.createElement("canvas");
+    const side = quarterTurns % 2 === 1;
+    canvas.width = side ? h : w;
+    canvas.height = side ? w : h;
+    const ctx = canvas.getContext("2d")!;
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((quarterTurns * Math.PI) / 2);
+    ctx.drawImage(source, -w / 2, -h / 2, w, h);
+    return canvas.toDataURL("image/jpeg", 0.9);
+  };
+
+  const preview = turned(0);
+  const urls = h > w ? [turned(1), turned(3), preview] : [preview, turned(2)];
+  return { images: urls.map((u) => u.slice(u.indexOf(",") + 1)), preview };
 }
 
-export async function readVoucher(base64: string): Promise<{ voucher: VoucherRead } | { error: string }> {
-  const { data, error } = await supabase.functions.invoke("read-voucher", { body: { image: base64, mime: "image/jpeg" } });
+export async function readVoucher(images: string[]): Promise<{ voucher: VoucherRead } | { error: string }> {
+  const { data, error } = await supabase.functions.invoke("read-voucher", { body: { images } });
   if (!error && data?.ok && data.voucher) return { voucher: data.voucher as VoucherRead };
   if (data?.error) return { error: data.error };
   if (error && typeof error === "object" && "context" in error) {
@@ -150,7 +164,9 @@ export function matchStudents(v: VoucherRead, students: StudentLite[], classes: 
   const serial = digits(v.serial_no);
   const scored: Candidate[] = [];
   for (const s of students) {
+    // The reader's first reading counts fully, its other possible readings a little less.
     let score = v.name_english ? nameAlike(v.name_english, s.full_name) : 0;
+    for (const other of v.name_alternatives ?? []) score = Math.max(score, 0.93 * nameAlike(other, s.full_name));
     if (v.father_english && s.father_name) score = 0.65 * score + 0.35 * nameAlike(v.father_english, s.father_name);
     if (v.class_number) {
       const nums = classNumbers(classById.get(s.class_id ?? ""));

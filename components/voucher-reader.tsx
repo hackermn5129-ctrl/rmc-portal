@@ -21,7 +21,7 @@ export function VoucherButton({ onRead }: { onRead: (v: VoucherPhoto) => void })
     setBusy(true);
     try {
       const photo = await shrinkPhoto(file);
-      const result = await readVoucher(photo.base64);
+      const result = await readVoucher(photo.images);
       if ("error" in result) setError(result.error);
       else onRead({ voucher: result.voucher, preview: photo.preview });
     } catch {
