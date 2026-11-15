@@ -11,6 +11,15 @@ export const residenceLabel = (r: Residence) => RESIDENCES.find((x) => x.value =
 
 export type HostelRate = { residence: Residence; monthly_rent: number; mess_fee: number };
 
+// School-wide charges set once on the Fee rates page.
+export type FeeRates = { tuition_upto_8: number; tuition_9_10: number; annual: number; lunch: number; transport_near: number; transport_far: number };
+export const emptyRates: FeeRates = { tuition_upto_8: 0, tuition_9_10: 0, annual: 0, lunch: 0, transport_near: 0, transport_far: 0 };
+
+// Academic fee for a class: Class 9 and 10 pay the higher one.
+export function tuitionFor(rates: FeeRates, grades?: number[] | null): number {
+  return (grades ?? []).some((g) => g >= 9) ? rates.tuition_9_10 : rates.tuition_upto_8;
+}
+
 export type FeePlan = {
   id: string;
   student_id: string;

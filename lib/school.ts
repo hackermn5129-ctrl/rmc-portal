@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export type ClassRow = { id: string; name: string; section: string; class_teacher_id?: string | null };
+export type ClassRow = { id: string; name: string; section: string; class_teacher_id?: string | null; grades?: number[] | null };
 export type Session = { id: string; name: string; starts_on: string; ends_on: string; is_current: boolean };
 export type TestKind = "daily" | "weekly" | "monthly";
 
@@ -11,7 +11,7 @@ export function sortClasses<T extends { name: string; section: string }>(rows: T
 }
 
 export async function loadClasses(): Promise<ClassRow[]> {
-  const { data } = await supabase.from("classes").select("id, name, section, class_teacher_id");
+  const { data } = await supabase.from("classes").select("id, name, section, class_teacher_id, grades");
   return sortClasses((data ?? []) as ClassRow[]);
 }
 

@@ -6,15 +6,17 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { Portal } from "@/components/portal";
 import { ErrorNote, Field, PrimaryButton } from "@/components/ui";
 import { FeeForm } from "@/components/fee-form";
-import { emptyDraft, monthStart, readDraft, type FeeDraft, type HostelRate } from "@/lib/fees";
+import { emptyDraft, emptyRates, monthStart, readDraft, tuitionFor, type FeeDraft, type FeeRates, type HostelRate } from "@/lib/fees";
+import { loadFeeRates } from "@/lib/fee-data";
 
-type ClassRow = { id: string; name: string; section: string };
+type ClassRow = { id: string; name: string; section: string; grades: number[] | null };
 
 function NewStudent() {
   const router = useRouter();
   const params = useSearchParams();
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [rates, setRates] = useState<HostelRate[]>([]);
+  const [feeRates, setFeeRates] = useState<FeeRates>(emptyRates);
   const [classId, setClassId] = useState(params.get("class") ?? "");
   const [name, setName] = useState("");
   const [father, setFather] = useState("");
@@ -25,15 +27,28 @@ function NewStudent() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    Promise.all([supabase.from("classes").select("id, name, section"), supabase.from("hostel_rates").select("residence, monthly_rent, mess_fee")]).then(
-      ([c, r]) => {
+    Promise.all([supabase.from("classes").select("id, name, section, grades"), supabase.from("hostel_rates").select("residence, monthly_rent, mess_fee"), loadFeeRates()]).then(
+      ([c, r, fr]) => {
         const rows = (c.data ?? []) as ClassRow[];
         rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }) || a.section.localeCompare(b.section));
         setClasses(rows);
         setRates((r.data ?? []) as HostelRate[]);
+        setFeeRates(fr);
+        const picked = rows.find((x) => x.id === (params.get("class") ?? ""));
+        if (picked) setFee((f) => (f.tuition_fee ? f : { ...f, tuition_fee: String(tuitionFor(fr, picked.grades)) }));
       },
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Choosing a class fills its academic fee, unless he has typed a different one.
+  function pickClass(id: string) {
+    const before = classes.find((c) => c.id === classId);
+    const after = classes.find((c) => c.id === id);
+    setClassId(id);
+    if (!after) return;
+    setFee((f) => (!f.tuition_fee || (before && f.tuition_fee === String(tuitionFor(feeRates, before.grades))) ? { ...f, tuition_fee: String(tuitionFor(feeRates, after.grades)) } : f));
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -74,7 +89,7 @@ function NewStudent() {
             <select
               id="class"
               value={classId}
-              onChange={(e) => setClassId(e.target.value)}
+              onChange={(e) => pickClass(e.target.value)}
               className="h-[52px] rounded-2xl border border-line-strong bg-bg px-4 text-base text-ink"
             >
               <option value="">Choose</option>
@@ -93,7 +108,7 @@ function NewStudent() {
 
       <section className="flex flex-col gap-4 rounded-[28px] border border-line bg-white p-5">
         <h2 className="text-base font-medium">Monthly fee</h2>
-        <FeeForm draft={fee} onChange={setFee} rates={rates} />
+        <FeeForm draft={fee} onChange={setFee} rates={rates} extras={feeRates} />
       </section>
 
       <ErrorNote>{error}</ErrorNote>

@@ -208,7 +208,7 @@ export default function SettingsPage() {
               { href: "/teacher/resources", label: "Study resources", note: "Short and long questions, practice MCQs, e-books", Icon: Library },
               { href: "/admin/notices", label: "Notices", note: "Send news to parents, students or teachers", Icon: Megaphone },
               { href: "/admin/promote", label: "Promote students", note: "Move everyone up at the end of a session", Icon: TrendingUp },
-              { href: "/admin/rates", label: "Hostel rates", note: "Rent and mess for each hostel type", Icon: BedDouble },
+              { href: "/admin/rates", label: "Fee rates", note: "Academic fee, hostel, lunch, transport, annual charges", Icon: BedDouble },
             ].map(({ href, label, note, Icon }) => (
               <li key={href} className="border-b border-line last:border-b-0">
                 <Link href={href} className="flex items-center justify-between gap-3 py-3">

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { monthStart } from "./fees";
+import { emptyRates, monthStart, type FeeRates } from "./fees";
 import { loadClasses, type ClassRow } from "./school";
 
 export type StudentLite = { id: string; full_name: string; father_name: string | null; class_id: string | null; phone: string | null; roll_no: string | null; reg_no: string | null };
@@ -44,3 +44,10 @@ export async function loadFeeOverview(): Promise<FeeOverview> {
 
 export const isPending = (b?: Balance) => !!b && b.outstanding > 0;
 export const isAlert = (b?: Balance) => !!b && b.outstanding > 0 && b.unpaid_months >= ALERT_MONTHS;
+
+export async function loadFeeRates(): Promise<FeeRates> {
+  const { data } = await supabase.from("fee_rates").select("key, amount");
+  const rates = { ...emptyRates };
+  for (const r of data ?? []) if (r.key in rates) rates[r.key as keyof FeeRates] = Number(r.amount);
+  return rates;
+}

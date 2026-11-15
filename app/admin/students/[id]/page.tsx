@@ -8,7 +8,8 @@ import { Portal } from "@/components/portal";
 import { WithId } from "@/components/route";
 import { ErrorNote, Field, PrimaryButton, SelectField } from "@/components/ui";
 import { FeeForm } from "@/components/fee-form";
-import { draftFromPlan, emptyDraft, monthLabel, monthStart, readDraft, residenceLabel, rs, type FeeDraft, type FeePlan, type HostelRate } from "@/lib/fees";
+import { draftFromPlan, emptyDraft, emptyRates, monthLabel, monthStart, readDraft, residenceLabel, rs, tuitionFor, type FeeDraft, type FeePlan, type FeeRates, type HostelRate } from "@/lib/fees";
+import { loadFeeRates } from "@/lib/fee-data";
 import { KIND_LABEL, className, loadClasses, pct, toneFor, type ClassRow, type TestKind } from "@/lib/school";
 import { loadResults, studentPercent, subjectPercent, subjectsWithTests, type ResultsData } from "@/lib/results";
 import type { Balance } from "@/lib/fee-data";
@@ -42,8 +43,8 @@ function Card({ title, children, action }: { title: string; children: React.Reac
 
 function Breakdown({ plan }: { plan: FeePlan }) {
   const parts = [
-    { label: "Tuition", value: plan.tuition_fee },
-    { label: "Hostel rent", value: plan.hostel_rent },
+    { label: "Academic fee", value: plan.tuition_fee },
+    { label: "Hostel", value: plan.hostel_rent },
     { label: "Mess", value: plan.mess_fee },
     { label: plan.other_note || "Other", value: plan.other_fee },
   ].filter((p) => Number(p.value) > 0);
@@ -226,6 +227,7 @@ function Profile({ id }: { id: string }) {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [plans, setPlans] = useState<FeePlan[]>([]);
   const [rates, setRates] = useState<HostelRate[]>([]);
+  const [feeRates, setFeeRates] = useState<FeeRates>(emptyRates);
   const [balance, setBalance] = useState<Balance | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [results, setResults] = useState<ResultsData | null>(null);
@@ -240,7 +242,7 @@ function Profile({ id }: { id: string }) {
     let active = true;
     (async () => {
       await supabase.rpc("generate_fee_records", { p_month: monthStart() });
-      const [s, c, p, r, b, pay, res] = await Promise.all([
+      const [s, c, p, r, b, pay, res, fr] = await Promise.all([
         supabase.from("students").select("id, full_name, father_name, roll_no, reg_no, phone, admission_date, class_id, status, profile_id").eq("id", id).maybeSingle(),
         loadClasses(),
         supabase.from("student_fee_plans").select("*").eq("student_id", id).order("effective_from", { ascending: false }),
@@ -248,6 +250,7 @@ function Profile({ id }: { id: string }) {
         supabase.from("student_fee_balance").select("*").eq("student_id", id).maybeSingle(),
         supabase.from("fee_payments").select("receipt_no, paid_on, amount, fee_records!inner(student_id)").eq("fee_records.student_id", id).order("paid_on", { ascending: false }),
         loadResults({ studentId: id }),
+        loadFeeRates(),
       ]);
       if (!active) return;
       const byReceipt = new Map<number, Receipt>();
@@ -260,6 +263,7 @@ function Profile({ id }: { id: string }) {
       setClasses(c);
       setPlans((p.data ?? []) as FeePlan[]);
       setRates((r.data ?? []) as HostelRate[]);
+      setFeeRates(fr);
       setBalance(b.data ? ({ ...b.data, outstanding: Number(b.data.outstanding), unpaid_months: Number(b.data.unpaid_months) } as Balance) : null);
       setReceipts([...byReceipt.values()]);
       setResults(res);
@@ -274,7 +278,8 @@ function Profile({ id }: { id: string }) {
   const upcoming = plans.filter((p) => p.effective_from > thisMonth);
 
   function startEdit() {
-    setDraft(current ? draftFromPlan(current) : emptyDraft);
+    const grades = classes.find((c) => c.id === student?.class_id)?.grades;
+    setDraft(current ? draftFromPlan(current) : { ...emptyDraft, tuition_fee: String(tuitionFor(feeRates, grades)) });
     setFrom(monthStart(current ? 1 : 0).slice(0, 7));
     setError("");
     setEditing(true);
@@ -340,7 +345,7 @@ function Profile({ id }: { id: string }) {
       {editing && (
         <form onSubmit={saveFee} noValidate className="mt-4 flex flex-col gap-4 rounded-[28px] border border-line bg-white p-5">
           <h2 className="text-base font-medium">{current ? "Change fee or hostel" : "Set fee"}</h2>
-          <FeeForm draft={draft} onChange={setDraft} rates={rates} />
+          <FeeForm draft={draft} onChange={setDraft} rates={rates} extras={feeRates} />
           <Field label="Starts from" id="from" type="month" value={from} onChange={(e) => setFrom(e.target.value)} />
           <p className="-mt-2 text-sm text-sub">Months before this keep their old fee.</p>
           <ErrorNote>{error}</ErrorNote>

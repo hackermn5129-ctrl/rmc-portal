@@ -1,19 +1,34 @@
 "use client";
-import { RESIDENCES, draftTotal, rs, type FeeDraft, type HostelRate, type Residence } from "@/lib/fees";
+import { RESIDENCES, draftTotal, rs, type FeeDraft, type FeeRates, type HostelRate, type Residence } from "@/lib/fees";
 import { Field } from "./ui";
 
 // Picks day scholar or a hostel type and the monthly charges.
 // Choosing a hostel type fills its rent and mess fee from the saved rates.
-export function FeeForm({ draft, onChange, rates }: { draft: FeeDraft; onChange: (d: FeeDraft) => void; rates: HostelRate[] }) {
+// For day scholars, lunch and transport are added with one tap from the saved rates.
+export function FeeForm({ draft, onChange, rates, extras }: { draft: FeeDraft; onChange: (d: FeeDraft) => void; rates: HostelRate[]; extras?: FeeRates }) {
   const set = (patch: Partial<FeeDraft>) => onChange({ ...draft, ...patch });
 
   function pick(r: Residence) {
     if (r === "day_scholar") return set({ residence: r, hostel_rent: "0", mess_fee: "0" });
     const rate = rates.find((x) => x.residence === r);
-    set({ residence: r, hostel_rent: String(rate?.monthly_rent ?? 0), mess_fee: String(rate?.mess_fee ?? 0) });
+    // Lunch and transport are for day scholars only.
+    const clear = lunchOn || transport ? { other_fee: "0", other_note: "" } : {};
+    set({ residence: r, hostel_rent: String(rate?.monthly_rent ?? 0), mess_fee: String(rate?.mess_fee ?? 0), ...clear });
   }
 
   const hostel = draft.residence !== "day_scholar";
+  const other = Number(draft.other_fee.replace(/,/g, "") || 0);
+  const lunchOn = /lunch/i.test(draft.other_note);
+  const transport: "near" | "far" | null = !/transport/i.test(draft.other_note) || !extras ? null : other - (lunchOn ? extras.lunch : 0) === extras.transport_far ? "far" : "near";
+
+  function setExtras(lunch: boolean, tr: "near" | "far" | null) {
+    if (!extras) return;
+    const total = (lunch ? extras.lunch : 0) + (tr === "near" ? extras.transport_near : tr === "far" ? extras.transport_far : 0);
+    set({ other_fee: String(total), other_note: [lunch && "Lunch", tr && "Transport"].filter(Boolean).join(" + ") });
+  }
+
+  const chip = (on: boolean) =>
+    `rounded-full border px-4 py-2 text-sm transition-colors ${on ? "border-navy bg-navy text-white" : "border-line-strong bg-bg text-ink hover:bg-white"}`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -42,11 +57,23 @@ export function FeeForm({ draft, onChange, rates }: { draft: FeeDraft; onChange:
         </div>
       </fieldset>
 
-      <Field label="Tuition fee (monthly)" id="tuition" inputMode="numeric" placeholder="4500" value={draft.tuition_fee} onChange={(e) => set({ tuition_fee: e.target.value })} />
-      {hostel && (
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Hostel rent" id="rent" inputMode="numeric" value={draft.hostel_rent} onChange={(e) => set({ hostel_rent: e.target.value })} />
-          <Field label="Mess fee" id="mess" inputMode="numeric" value={draft.mess_fee} onChange={(e) => set({ mess_fee: e.target.value })} />
+      <Field label="Academic fee (monthly)" id="tuition" inputMode="numeric" placeholder="5000" value={draft.tuition_fee} onChange={(e) => set({ tuition_fee: e.target.value })} />
+      {hostel && <Field label="Hostel fee (mess included)" id="rent" inputMode="numeric" value={draft.hostel_rent} onChange={(e) => set({ hostel_rent: e.target.value })} />}
+      {hostel && Number(draft.mess_fee) > 0 && <Field label="Mess fee" id="mess" inputMode="numeric" value={draft.mess_fee} onChange={(e) => set({ mess_fee: e.target.value })} />}
+      {!hostel && extras && (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-sub">Also takes</span>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={lunchOn} onClick={() => setExtras(!lunchOn, transport)} className={chip(lunchOn)}>
+              Lunch from mess · {rs(extras.lunch)}
+            </button>
+            <button type="button" aria-pressed={transport === "near"} onClick={() => setExtras(lunchOn, transport === "near" ? null : "near")} className={chip(transport === "near")}>
+              Transport · {rs(extras.transport_near)}
+            </button>
+            <button type="button" aria-pressed={transport === "far"} onClick={() => setExtras(lunchOn, transport === "far" ? null : "far")} className={chip(transport === "far")}>
+              Transport, far · {rs(extras.transport_far)}
+            </button>
+          </div>
         </div>
       )}
       <div className="grid grid-cols-[110px_1fr] gap-3">
