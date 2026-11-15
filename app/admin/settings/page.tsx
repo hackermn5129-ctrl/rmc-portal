@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { BedDouble, ChevronRight, FileText, Megaphone, TrendingUp } from "lucide-react";
+import { BedDouble, ChevronRight, FileText, ListChecks, Megaphone, PlayCircle, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Portal, SignOutButton } from "@/components/portal";
 import { ErrorNote, Field, OkNote, PrimaryButton } from "@/components/ui";
@@ -203,6 +203,8 @@ export default function SettingsPage() {
           <ul className="mt-5 rounded-3xl border border-line bg-white px-4 py-1">
             {[
               { href: "/teacher/tests", label: "My test marks", note: "Enter marks for the subjects you teach", Icon: FileText },
+              { href: "/teacher/mcq", label: "My MCQ tests", note: "Online tests students take on the phone", Icon: ListChecks },
+              { href: "/teacher/lectures", label: "My video lectures", note: "YouTube lessons by book chapter", Icon: PlayCircle },
               { href: "/admin/notices", label: "Notices", note: "Send news to parents, students or teachers", Icon: Megaphone },
               { href: "/admin/promote", label: "Promote students", note: "Move everyone up at the end of a session", Icon: TrendingUp },
               { href: "/admin/rates", label: "Hostel rates", note: "Rent and mess for each hostel type", Icon: BedDouble },

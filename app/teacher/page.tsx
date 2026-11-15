@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, ClipboardCheck, FileText } from "lucide-react";
+import { ChevronRight, ClipboardCheck, FileText, ListChecks, PlayCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Portal } from "@/components/portal";
 import { className } from "@/lib/school";
@@ -53,6 +53,8 @@ function Home({ teacherId }: { teacherId: string }) {
   const actions = [
     incharge.length > 0 && { href: "/teacher/attendance", label: "Mark attendance", urdu: "حاضری", Icon: ClipboardCheck },
     teaching.length > 0 && { href: "/teacher/tests", label: "Tests and results", urdu: "ٹیسٹ اور نتائج", Icon: FileText },
+    teaching.length > 0 && { href: "/teacher/mcq", label: "MCQ tests", urdu: "آن لائن ٹیسٹ", Icon: ListChecks },
+    teaching.length > 0 && { href: "/teacher/lectures", label: "Video lectures", urdu: "ویڈیو لیکچر", Icon: PlayCircle },
   ].filter(Boolean) as { href: string; label: string; urdu: string; Icon: typeof FileText }[];
 
   return (

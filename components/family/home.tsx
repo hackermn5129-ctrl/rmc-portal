@@ -19,6 +19,7 @@ import {
   type TestResult,
 } from "@/lib/family";
 import { DayDot, LineChart, Ring, Urdu, toneColor } from "./visuals";
+import { NextTestCard } from "./learn";
 import type { Ctx } from "./shell";
 
 type Data = { days: Day[]; tests: TestResult[]; fees: Awaited<ReturnType<typeof loadFees>>; notices: Notice[] };
@@ -300,6 +301,8 @@ export function StudentHome(ctx: Ctx) {
           )}
         </Link>
       </div>
+
+      <NextTestCard {...ctx} />
 
       <NoticeCard notices={notices} />
 

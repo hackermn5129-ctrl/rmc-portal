@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Check, Megaphone, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { Check, ChevronRight, Megaphone, TriangleAlert } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { monthLabel, residenceLabel, rs, type FeePlan } from "@/lib/fees";
 import { loadFees, loadNotices, useChild, type Notice } from "@/lib/family";
@@ -139,6 +140,23 @@ export function More({ profile }: { profile: Profile }) {
           </ul>
         </>
       )}
+
+      <ul className="mt-6 flex flex-col rounded-3xl border border-line bg-white px-4 py-1">
+        {(profile.role === "student"
+          ? [
+              { href: "/student/attendance", label: "Attendance" },
+              { href: "/student/fees", label: "Fees" },
+            ]
+          : [{ href: "/parent/tests", label: "Online MCQ tests" }]
+        ).map((l) => (
+          <li key={l.href} className="border-b border-line last:border-b-0">
+            <Link href={l.href} className="flex min-h-14 items-center justify-between text-[15px]">
+              {l.label}
+              <ChevronRight aria-hidden className="size-[18px] text-sub" strokeWidth={1.75} />
+            </Link>
+          </li>
+        ))}
+      </ul>
 
       <h2 className="mt-6 text-base font-medium">Notices</h2>
       <ul className="mt-3 flex flex-col gap-2">

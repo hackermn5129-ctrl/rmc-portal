@@ -6,6 +6,7 @@ import { Portal } from "@/components/portal";
 import { ErrorNote, Field, PrimaryButton, SelectField } from "@/components/ui";
 import { className, currentSession, type Session, type TestKind } from "@/lib/school";
 import { loadMyClasses, todayIso, type MyClass } from "@/lib/teacher";
+import { ChapterPicker } from "@/components/chapter-picker";
 
 const KINDS: { value: TestKind; label: string; urdu: string; note: string }[] = [
   { value: "daily", label: "Daily", urdu: "روزانہ", note: "Least weight" },
@@ -17,7 +18,7 @@ function NewTest({ teacherId }: { teacherId: string }) {
   const router = useRouter();
   const [classes, setClasses] = useState<MyClass[]>([]);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [f, setF] = useState({ class_id: "", subject_id: "", kind: "weekly" as TestKind, title: "", held_on: todayIso(), total_marks: "" });
+  const [f, setF] = useState({ class_id: "", subject_id: "", kind: "weekly" as TestKind, chapter_id: "", title: "", held_on: todayIso(), total_marks: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -54,6 +55,7 @@ function NewTest({ teacherId }: { teacherId: string }) {
         subject_id: f.subject_id,
         kind: f.kind,
         title: f.title.trim(),
+        chapter_id: f.chapter_id || null,
         held_on: f.held_on,
         total_marks: total,
         academic_year_id: session!.id,
@@ -94,7 +96,7 @@ function NewTest({ teacherId }: { teacherId: string }) {
       <div className="grid grid-cols-2 gap-3">
         <SelectField label="Class" id="cls" value={f.class_id} onChange={(e) => {
             const subs = classes.find((c) => c.id === e.target.value)?.subjects ?? [];
-            setF({ ...f, class_id: e.target.value, subject_id: subs.length === 1 ? subs[0].id : "" });
+            setF({ ...f, class_id: e.target.value, subject_id: subs.length === 1 ? subs[0].id : "", chapter_id: "" });
           }}>
           <option value="">Choose</option>
           {classes.map((c) => (
@@ -103,7 +105,7 @@ function NewTest({ teacherId }: { teacherId: string }) {
             </option>
           ))}
         </SelectField>
-        <SelectField label="Subject" id="sub" value={f.subject_id} onChange={(e) => setF({ ...f, subject_id: e.target.value })}>
+        <SelectField label="Subject" id="sub" value={f.subject_id} onChange={(e) => setF({ ...f, subject_id: e.target.value, chapter_id: "" })}>
           <option value="">Choose</option>
           {subjects.map((s) => (
             <option key={s.id} value={s.id}>
@@ -116,7 +118,8 @@ function NewTest({ teacherId }: { teacherId: string }) {
         <Field label="Total marks" id="total" inputMode="numeric" placeholder="25" value={f.total_marks} onChange={(e) => setF({ ...f, total_marks: e.target.value })} />
         <Field label="Date" id="date" type="date" max={todayIso()} value={f.held_on} onChange={(e) => setF({ ...f, held_on: e.target.value })} />
       </div>
-      <Field label="Topic (optional)" id="title" placeholder="Chapter 3" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+      <ChapterPicker classId={f.class_id} subjectId={f.subject_id} value={f.chapter_id} onChange={(id) => setF({ ...f, chapter_id: id })} teacherId={teacherId} />
+      <Field label="Topic (optional)" id="title" placeholder="Exercise 3.2" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
       <ErrorNote>{error}</ErrorNote>
       <PrimaryButton type="submit" busy={busy}>
         Next: enter marks

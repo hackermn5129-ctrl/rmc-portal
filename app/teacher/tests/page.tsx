@@ -94,7 +94,7 @@ function Tests({ teacherId }: { teacherId: string }) {
 
 export default function TestsPage() {
   return (
-    <Portal role={["teacher", "admin"]} title="Tests and results" back="/teacher">
+    <Portal role={["teacher", "admin"]} title="Tests and results" back={(p) => (p.role === "admin" ? "/admin/settings" : "/teacher")}>
       {(p) => <Tests teacherId={p.id} />}
     </Portal>
   );

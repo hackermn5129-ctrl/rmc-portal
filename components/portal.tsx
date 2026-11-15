@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CalendarCheck, ChartColumn, GraduationCap, House, LogOut, Settings, Users, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarCheck, ChartColumn, GraduationCap, House, ListChecks, LogOut, PlayCircle, Settings, Users, Wallet } from "lucide-react";
 import { supabase, type Profile, type Role } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 
@@ -29,12 +29,20 @@ const initials = (name: string) =>
     .map((w) => w[0]?.toUpperCase())
     .join("") || "?";
 
-const familyNav = (base: string) => [
+const familyNav = (base: string) =>
+  base === "/student"
+    ? [
+        { href: base, label: "Home", Icon: House, match: (p: string) => p === base },
+        { href: `${base}/tests`, label: "Tests", Icon: ListChecks, match: (p: string) => p.startsWith(`${base}/tests`) },
+        { href: `${base}/lectures`, label: "Lectures", Icon: PlayCircle, match: (p: string) => p.startsWith(`${base}/lectures`) },
+        { href: `${base}/progress`, label: "Progress", Icon: ChartColumn, match: (p: string) => p.startsWith(`${base}/progress`) },
+      ]
+    : [
   { href: base, label: "Home", Icon: House, match: (p: string) => p === base },
   { href: `${base}/attendance`, label: "Attendance", Icon: CalendarCheck, match: (p: string) => p.startsWith(`${base}/attendance`) },
   { href: `${base}/progress`, label: "Progress", Icon: ChartColumn, match: (p: string) => p.startsWith(`${base}/progress`) },
   { href: `${base}/fees`, label: "Fees", Icon: Wallet, match: (p: string) => p.startsWith(`${base}/fees`) },
-];
+      ];
 
 function FamilyNav({ base }: { base: string }) {
   const path = usePathname();
@@ -95,7 +103,7 @@ export function Portal({
   /** A function is worked out only after sign-in, in the browser (e.g. for today's month). */
   title: string | ((profile: Profile) => ReactNode);
   subtitle?: string | ((profile: Profile) => ReactNode);
-  back?: string;
+  back?: string | ((profile: Profile) => string);
   children: (profile: Profile) => ReactNode;
 }) {
   const router = useRouter();
@@ -108,13 +116,14 @@ export function Portal({
   }
 
   const isAdmin = profile.role === "admin";
+  const backHref = typeof back === "function" ? back(profile) : back;
   const family = profile.role === "student" || profile.role === "parent" ? `/${profile.role}` : null;
 
   return (
     <main className={`flex flex-1 flex-col px-5 pt-12 print:p-0 ${isAdmin || family ? "pb-32" : "pb-8"}`}>
       <header className="flex items-center justify-between gap-3 print:hidden">
-        {back && (
-          <Link href={back} aria-label="Back" className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white hover:bg-bg">
+        {backHref && (
+          <Link href={backHref} aria-label="Back" className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line-strong bg-white hover:bg-bg">
             <ArrowLeft aria-hidden className="size-[18px]" strokeWidth={1.75} />
           </Link>
         )}

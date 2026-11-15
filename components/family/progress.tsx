@@ -145,6 +145,10 @@ export function Progress(ctx: Ctx) {
           );
         })}
       </div>
+      <Link href={`${ctx.base}/tests`} className="mt-3 flex min-h-14 items-center justify-between rounded-3xl border border-line bg-white px-4 text-[15px]">
+        Online MCQ test scores
+        <ChevronRight aria-hidden className="size-4 text-sub" strokeWidth={1.75} />
+      </Link>
     </>
   );
 }
