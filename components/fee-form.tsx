@@ -3,9 +3,10 @@ import { RESIDENCES, draftTotal, rs, type FeeDraft, type FeeRates, type HostelRa
 import { Field } from "./ui";
 
 // Picks day scholar or a hostel type and the monthly charges.
-// Choosing a hostel type fills its rent and mess fee from the saved rates.
+// Choosing a hostel type fills its rent and mess fee from the saved rates
+// (plus the Class 9 and 10 extra, when the student is in those classes).
 // For day scholars, lunch and transport are added with one tap from the saved rates.
-export function FeeForm({ draft, onChange, rates, extras }: { draft: FeeDraft; onChange: (d: FeeDraft) => void; rates: HostelRate[]; extras?: FeeRates }) {
+export function FeeForm({ draft, onChange, rates, extras, hostelExtra = 0 }: { draft: FeeDraft; onChange: (d: FeeDraft) => void; rates: HostelRate[]; extras?: FeeRates; hostelExtra?: number }) {
   const set = (patch: Partial<FeeDraft>) => onChange({ ...draft, ...patch });
 
   function pick(r: Residence) {
@@ -13,7 +14,7 @@ export function FeeForm({ draft, onChange, rates, extras }: { draft: FeeDraft; o
     const rate = rates.find((x) => x.residence === r);
     // Lunch and transport are for day scholars only.
     const clear = lunchOn || transport ? { other_fee: "0", other_note: "" } : {};
-    set({ residence: r, hostel_rent: String(rate?.monthly_rent ?? 0), mess_fee: String(rate?.mess_fee ?? 0), ...clear });
+    set({ residence: r, hostel_rent: String(Number(rate?.monthly_rent ?? 0) + hostelExtra), mess_fee: String(rate?.mess_fee ?? 0), ...clear });
   }
 
   const hostel = draft.residence !== "day_scholar";

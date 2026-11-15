@@ -6,7 +6,7 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { Portal } from "@/components/portal";
 import { ErrorNote, Field, PrimaryButton } from "@/components/ui";
 import { FeeForm } from "@/components/fee-form";
-import { emptyDraft, emptyRates, monthStart, readDraft, tuitionFor, type FeeDraft, type FeeRates, type HostelRate } from "@/lib/fees";
+import { emptyDraft, emptyRates, hostelExtraFor, monthStart, readDraft, tuitionFor, type FeeDraft, type FeeRates, type HostelRate } from "@/lib/fees";
 import { loadFeeRates } from "@/lib/fee-data";
 
 type ClassRow = { id: string; name: string; section: string; grades: number[] | null };
@@ -47,7 +47,14 @@ function NewStudent() {
     const after = classes.find((c) => c.id === id);
     setClassId(id);
     if (!after) return;
-    setFee((f) => (!f.tuition_fee || (before && f.tuition_fee === String(tuitionFor(feeRates, before.grades))) ? { ...f, tuition_fee: String(tuitionFor(feeRates, after.grades)) } : f));
+    setFee((f) => {
+      const next = !f.tuition_fee || (before && f.tuition_fee === String(tuitionFor(feeRates, before.grades))) ? { ...f, tuition_fee: String(tuitionFor(feeRates, after.grades)) } : f;
+      // A hostel fee filled from the rates moves with the class too (Class 9 and 10 pay the extra).
+      if (next.residence === "day_scholar") return next;
+      const base = Number(rates.find((r) => r.residence === next.residence)?.monthly_rent ?? 0);
+      const was = base + hostelExtraFor(feeRates, before?.grades);
+      return Number(next.hostel_rent) === was ? { ...next, hostel_rent: String(base + hostelExtraFor(feeRates, after.grades)) } : next;
+    });
   }
 
   async function save(e: FormEvent) {
@@ -108,7 +115,7 @@ function NewStudent() {
 
       <section className="flex flex-col gap-4 rounded-[28px] border border-line bg-white p-5">
         <h2 className="text-base font-medium">Monthly fee</h2>
-        <FeeForm draft={fee} onChange={setFee} rates={rates} extras={feeRates} />
+        <FeeForm draft={fee} onChange={setFee} rates={rates} extras={feeRates} hostelExtra={hostelExtraFor(feeRates, classes.find((c) => c.id === classId)?.grades)} />
       </section>
 
       <ErrorNote>{error}</ErrorNote>

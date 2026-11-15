@@ -8,7 +8,7 @@ import { Portal } from "@/components/portal";
 import { WithId } from "@/components/route";
 import { ErrorNote, Field, PrimaryButton, SelectField } from "@/components/ui";
 import { FeeForm } from "@/components/fee-form";
-import { draftFromPlan, emptyDraft, emptyRates, monthLabel, monthStart, readDraft, residenceLabel, rs, tuitionFor, type FeeDraft, type FeePlan, type FeeRates, type HostelRate } from "@/lib/fees";
+import { draftFromPlan, emptyDraft, emptyRates, hostelExtraFor, monthLabel, monthStart, readDraft, residenceLabel, rs, tuitionFor, type FeeDraft, type FeePlan, type FeeRates, type HostelRate } from "@/lib/fees";
 import { loadFeeRates } from "@/lib/fee-data";
 import { KIND_LABEL, className, loadClasses, pct, toneFor, type ClassRow, type TestKind } from "@/lib/school";
 import { loadResults, studentPercent, subjectPercent, subjectsWithTests, type ResultsData } from "@/lib/results";
@@ -345,7 +345,7 @@ function Profile({ id }: { id: string }) {
       {editing && (
         <form onSubmit={saveFee} noValidate className="mt-4 flex flex-col gap-4 rounded-[28px] border border-line bg-white p-5">
           <h2 className="text-base font-medium">{current ? "Change fee or hostel" : "Set fee"}</h2>
-          <FeeForm draft={draft} onChange={setDraft} rates={rates} extras={feeRates} />
+          <FeeForm draft={draft} onChange={setDraft} rates={rates} extras={feeRates} hostelExtra={hostelExtraFor(feeRates, classes.find((c) => c.id === student?.class_id)?.grades)} />
           <Field label="Starts from" id="from" type="month" value={from} onChange={(e) => setFrom(e.target.value)} />
           <p className="-mt-2 text-sm text-sub">Months before this keep their old fee.</p>
           <ErrorNote>{error}</ErrorNote>

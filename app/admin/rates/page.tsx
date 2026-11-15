@@ -105,6 +105,7 @@ function Rates() {
         {HOSTELS.map((h) => (
           <Field key={h.value} label={h.label} id={h.value} inputMode="numeric" value={draft.hostel[h.value]} onChange={(e) => setDraft({ ...draft, hostel: { ...draft.hostel, [h.value]: e.target.value } })} />
         ))}
+        <Field label="Extra for Class 9 and 10" id="hostel_extra_9_10" inputMode="numeric" value={draft.rates.hostel_extra_9_10} onChange={(e) => setDraft({ ...draft, rates: { ...draft.rates, hostel_extra_9_10: e.target.value } })} />
       </div>
 
       {GROUPS.slice(1).map((g) => (
