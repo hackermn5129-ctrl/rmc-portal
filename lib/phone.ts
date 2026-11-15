@@ -16,3 +16,12 @@ export function isValidPhone(raw: string): boolean {
 export function phoneToLoginId(raw: string): string {
   return `${normalizePhone(raw)}@${LOGIN_DOMAIN}`;
 }
+
+// Students sign in with their registration number (like 000083). Shorter numbers are padded: 83 -> 000083.
+export function isRegNo(raw: string): boolean {
+  return /^\d{1,8}$/.test(raw.replace(/\s/g, "")) && !isValidPhone(raw);
+}
+
+export function regToLoginId(raw: string): string {
+  return `r${raw.replace(/\D/g, "").padStart(6, "0")}@${LOGIN_DOMAIN}`;
+}

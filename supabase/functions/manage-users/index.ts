@@ -103,17 +103,22 @@ Deno.serve(async (req: Request) => {
   }
 
   const studentId = body.student_id ? String(body.student_id) : null;
+  let regNo: string | null = null;
   if (studentId) {
-    const { data: st } = await admin.from("students").select("id, profile_id").eq("id", studentId).maybeSingle();
+    const { data: st } = await admin.from("students").select("id, profile_id, reg_no").eq("id", studentId).maybeSingle();
     if (!st) return json({ error: "That student wasn't found." }, 404);
     if (role === "student" && st.profile_id) return json({ error: "This student already has a login." }, 409);
+    regNo = st.reg_no ? String(st.reg_no).replace(/\D/g, "").padStart(6, "0") : null;
   }
 
   const fullName = String(body.full_name ?? "").trim();
   const phone = normalizePhone(String(body.phone ?? ""));
   const password = String(body.password ?? "");
   if (fullName.length < 3) return json({ error: "Enter the full name." }, 400);
-  if (!/^03\d{9}$/.test(phone)) return json({ error: "Enter an 11-digit mobile number, like 0300 1234567." }, 400);
+  // A student login made from the student's profile signs in with the registration number.
+  const byReg = role === "student" && !!studentId && !phone;
+  if (byReg && !regNo) return json({ error: "Add the registration number first." }, 400);
+  if (!byReg && !/^03\d{9}$/.test(phone)) return json({ error: "Enter an 11-digit mobile number, like 0300 1234567." }, 400);
 
   if (role === "parent" && studentId) {
     const { data: existing } = await admin.from("profiles").select("id, role").eq("phone", phone).maybeSingle();
@@ -126,17 +131,17 @@ Deno.serve(async (req: Request) => {
   if (password.length < 8) return json({ error: "Use a password with at least 8 characters." }, 400);
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: `${phone}@${LOGIN_DOMAIN}`,
+    email: byReg ? `r${regNo}@${LOGIN_DOMAIN}` : `${phone}@${LOGIN_DOMAIN}`,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName, phone },
+    user_metadata: byReg ? { full_name: fullName, reg_no: regNo } : { full_name: fullName, phone },
   });
   if (createError || !created?.user) {
     const taken = /already|registered|exists/i.test(createError?.message ?? "");
-    return json({ error: taken ? "That phone number already has an account." : "The account wasn't created. Try again." }, taken ? 409 : 500);
+    return json({ error: taken ? (byReg ? "That registration number already has a login." : "That phone number already has an account.") : "The account wasn't created. Try again." }, taken ? 409 : 500);
   }
 
-  const { error: profileError } = await admin.from("profiles").insert({ id: created.user.id, role, full_name: fullName, phone });
+  const { error: profileError } = await admin.from("profiles").insert({ id: created.user.id, role, full_name: fullName, phone: byReg ? null : phone });
   if (profileError) {
     await admin.auth.admin.deleteUser(created.user.id);
     return json({ error: "The account wasn't saved. Try again." }, 500);

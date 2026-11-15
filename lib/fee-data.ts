@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import { monthStart } from "./fees";
 import { loadClasses, type ClassRow } from "./school";
 
-export type StudentLite = { id: string; full_name: string; father_name: string | null; class_id: string | null; phone: string | null; roll_no: string | null };
+export type StudentLite = { id: string; full_name: string; father_name: string | null; class_id: string | null; phone: string | null; roll_no: string | null; reg_no: string | null };
 export type Balance = { student_id: string; total_due: number; total_paid: number; outstanding: number; unpaid_months: number; oldest_unpaid: string | null };
 export const ALERT_MONTHS = 2;
 
@@ -21,7 +21,7 @@ export async function loadFeeOverview(): Promise<FeeOverview> {
 
   const [classes, st, bal, month] = await Promise.all([
     loadClasses(),
-    supabase.from("students").select("id, full_name, father_name, class_id, phone, roll_no").eq("status", "active").order("full_name"),
+    supabase.from("students").select("id, full_name, father_name, class_id, phone, roll_no, reg_no").eq("status", "active").order("full_name"),
     supabase.from("student_fee_balance").select("*"),
     supabase.from("fee_status").select("amount_due, amount_paid").eq("month", monthStart()),
   ]);

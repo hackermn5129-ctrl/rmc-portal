@@ -61,7 +61,7 @@ function Pay({ preselect }: { preselect: string | null }) {
     const q = query.trim().toLowerCase();
     if (q.length < 2 && !classFilter) return [];
     return data.students
-      .filter((s) => (!classFilter || s.class_id === classFilter) && (q.length < 2 || s.full_name.toLowerCase().includes(q) || (s.father_name ?? "").toLowerCase().includes(q)))
+      .filter((s) => (!classFilter || s.class_id === classFilter) && (q.length < 2 || s.full_name.toLowerCase().includes(q) || (s.father_name ?? "").toLowerCase().includes(q) || (s.reg_no ?? "").includes(q)))
       .slice(0, 30);
   }, [data, query, classFilter]);
 
@@ -92,7 +92,7 @@ function Pay({ preselect }: { preselect: string | null }) {
       <div className="mt-5 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <label htmlFor="q" className="text-sm text-sub">
-            Student name
+            Student name or registration no
           </label>
           <div className="relative">
             <Search aria-hidden className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-sub" strokeWidth={1.75} />
@@ -100,7 +100,7 @@ function Pay({ preselect }: { preselect: string | null }) {
               id="q"
               autoFocus
               autoComplete="off"
-              placeholder="Start typing, like Muhammad"
+              placeholder="Name or registration no, like Muhammad"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="h-[52px] w-full rounded-2xl border border-line-strong bg-white pl-11 pr-4 text-base text-ink placeholder:text-sub/70"
@@ -127,6 +127,7 @@ function Pay({ preselect }: { preselect: string | null }) {
                       <span className="truncate text-[15px]">{s.full_name}</span>
                       <span className="truncate text-sm text-sub">
                         {className(classById.get(s.class_id ?? ""))}
+                        {s.reg_no ? ` · ${s.reg_no}` : ""}
                         {s.father_name ? ` · s/o ${s.father_name}` : ""}
                         {s.phone ? ` · ${s.phone}` : ""}
                       </span>

@@ -10,7 +10,7 @@ import { className, waNumber } from "@/lib/school";
 type Line = { amount: number; paid_on: string; method: string | null; fee_records: { month: string; student_id: string; amount_due: number } };
 type Info = {
   lines: Line[];
-  student: { id: string; full_name: string; father_name: string | null; phone: string | null; roll_no: string | null; classes: { name: string; section: string } | null };
+  student: { id: string; full_name: string; father_name: string | null; phone: string | null; roll_no: string | null; reg_no: string | null; classes: { name: string; section: string } | null };
   remaining: number;
 };
 
@@ -23,7 +23,7 @@ async function loadReceipt(no: string): Promise<Info | null> {
   if (!first) return null;
   const sid = first.fee_records.student_id;
   const [st, bal] = await Promise.all([
-    supabase.from("students").select("id, full_name, father_name, phone, roll_no, classes(name, section)").eq("id", sid).single(),
+    supabase.from("students").select("id, full_name, father_name, phone, roll_no, reg_no, classes(name, section)").eq("id", sid).single(),
     supabase.from("student_fee_balance").select("outstanding").eq("student_id", sid).maybeSingle(),
   ]);
   const sorted = [...(lines as unknown as Line[])].sort((a, b) => a.fee_records.month.localeCompare(b.fee_records.month));
@@ -79,6 +79,12 @@ function Receipt({ no }: { no: string }) {
           <dd>{date}</dd>
           <dt className="text-sub">Student</dt>
           <dd>{s.full_name}</dd>
+          {s.reg_no && (
+            <>
+              <dt className="text-sub">Registration no</dt>
+              <dd className="tabular-nums">{s.reg_no}</dd>
+            </>
+          )}
           {s.father_name && (
             <>
               <dt className="text-sub">Father</dt>

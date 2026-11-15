@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { isValidPhone, phoneToLoginId } from "@/lib/phone";
+import { isRegNo, isValidPhone, phoneToLoginId, regToLoginId } from "@/lib/phone";
 import { Card, Crest, ErrorNote, Field, PrimaryButton } from "@/components/ui";
 
 export default function LoginPage() {
@@ -26,15 +26,16 @@ export default function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (!isValidPhone(phone)) {
-      setError("Enter an 11-digit mobile number, like 0300 1234567.");
+    const asPhone = isValidPhone(phone);
+    if (!asPhone && !isRegNo(phone)) {
+      setError("Enter your phone number (0300 1234567) or, for students, your registration number.");
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: phoneToLoginId(phone), password });
+    const { error } = await supabase.auth.signInWithPassword({ email: asPhone ? phoneToLoginId(phone) : regToLoginId(phone), password });
     setBusy(false);
     if (error) {
-      setError("That phone number or password isn't right. Try again.");
+      setError("That number or password isn't right. Try again.");
       return;
     }
     router.replace("/");
@@ -49,7 +50,7 @@ export default function LoginPage() {
             <h1 className="text-[26px] font-medium tracking-tight">Sign in</h1>
             <p className="text-sm text-sub">For students, parents, teachers and staff</p>
           </div>
-          <Field label="Phone number" id="phone" type="tel" inputMode="numeric" autoComplete="tel" placeholder="0300 1234567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Field label="Phone number or registration no" id="phone" type="tel" inputMode="numeric" autoComplete="username" placeholder="0300 1234567 or 000083" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <Field label="Password" id="password" type="password" autoComplete="current-password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} />
           <ErrorNote>{error}</ErrorNote>
           <PrimaryButton type="submit" busy={busy}>

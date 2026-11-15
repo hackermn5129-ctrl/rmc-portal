@@ -19,6 +19,7 @@ type Student = {
   full_name: string;
   father_name: string | null;
   roll_no: string | null;
+  reg_no: string | null;
   phone: string | null;
   admission_date: string;
   class_id: string | null;
@@ -77,6 +78,7 @@ function Details({ student, classes, onSaved }: { student: Student; classes: Cla
         full_name: f.full_name.trim(),
         father_name: f.father_name?.trim() || null,
         roll_no: f.roll_no?.trim() || null,
+        reg_no: f.reg_no?.trim() || null,
         phone: f.phone?.trim() ? normalizePhone(f.phone) : null,
         class_id: f.class_id || null,
         status: f.status,
@@ -111,6 +113,8 @@ function Details({ student, classes, onSaved }: { student: Student; classes: Cla
           <dd>{student.father_name || "Not added"}</dd>
           <dt className="text-sub">Class</dt>
           <dd>{className(cls) || "Not set"}</dd>
+          <dt className="text-sub">Registration no</dt>
+          <dd className="tabular-nums">{student.reg_no || "Not added"}</dd>
           <dt className="text-sub">Roll no</dt>
           <dd>{student.roll_no || "Not added"}</dd>
           <dt className="text-sub">Parent&apos;s phone</dt>
@@ -137,6 +141,7 @@ function Details({ student, classes, onSaved }: { student: Student; classes: Cla
         </SelectField>
         <Field label="Roll no" id="e_roll" value={f.roll_no ?? ""} onChange={(e) => setF({ ...f, roll_no: e.target.value })} />
       </div>
+      <Field label="Registration no" id="e_reg" inputMode="numeric" value={f.reg_no ?? ""} onChange={(e) => setF({ ...f, reg_no: e.target.value })} />
       <Field label="Parent's phone (WhatsApp)" id="e_phone" type="tel" inputMode="numeric" placeholder="0300 1234567" value={f.phone ?? ""} onChange={(e) => setF({ ...f, phone: e.target.value })} />
       <SelectField label="Status" id="e_status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as Student["status"] })}>
         <option value="active">Studying here</option>
@@ -236,7 +241,7 @@ function Profile({ id }: { id: string }) {
     (async () => {
       await supabase.rpc("generate_fee_records", { p_month: monthStart() });
       const [s, c, p, r, b, pay, res] = await Promise.all([
-        supabase.from("students").select("id, full_name, father_name, roll_no, phone, admission_date, class_id, status, profile_id").eq("id", id).maybeSingle(),
+        supabase.from("students").select("id, full_name, father_name, roll_no, reg_no, phone, admission_date, class_id, status, profile_id").eq("id", id).maybeSingle(),
         loadClasses(),
         supabase.from("student_fee_plans").select("*").eq("student_id", id).order("effective_from", { ascending: false }),
         supabase.from("hostel_rates").select("residence, monthly_rent, mess_fee"),

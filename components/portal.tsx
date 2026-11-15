@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, GraduationCap, House, LogOut, Users, Wallet } from "lucide-react";
+import { ArrowLeft, GraduationCap, House, LogOut, Settings, Users, Wallet } from "lucide-react";
 import { supabase, type Profile, type Role } from "@/lib/supabase";
 import { useProfile } from "@/lib/useProfile";
 
@@ -13,6 +13,12 @@ const ADMIN_NAV = [
   { href: "/admin/students", label: "Students", Icon: GraduationCap, match: (p: string) => p.startsWith("/admin/students") || p.startsWith("/admin/classes") },
   { href: "/admin/teachers", label: "Teachers", Icon: Users, match: (p: string) => p.startsWith("/admin/teachers") },
   { href: "/admin/fees", label: "Fees", Icon: Wallet, match: (p: string) => p.startsWith("/admin/fees") },
+  {
+    href: "/admin/settings",
+    label: "Setup",
+    Icon: Settings,
+    match: (p: string) => ["/admin/settings", "/admin/rates", "/admin/notices", "/admin/promote"].some((x) => p.startsWith(x)),
+  },
 ];
 
 const initials = (name: string) =>
@@ -27,7 +33,7 @@ function AdminNav() {
   const path = usePathname();
   return (
     <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 mx-auto w-full max-w-[430px] px-5 pb-4 print:hidden">
-      <div className="grid grid-cols-4 gap-1 rounded-[32px] border border-line bg-white p-2 shadow-[0_8px_24px_rgba(19,35,58,0.08)]">
+      <div className="grid grid-cols-5 gap-1 rounded-[32px] border border-line bg-white p-2 shadow-[0_8px_24px_rgba(19,35,58,0.08)]">
         {ADMIN_NAV.map(({ href, label, Icon, match }) => {
           const on = match(path);
           return (

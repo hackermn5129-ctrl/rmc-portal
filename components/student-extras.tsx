@@ -97,7 +97,7 @@ export function AttendanceSummary({ studentId }: { studentId: string }) {
 }
 
 type Account = { id: string; full_name: string; phone: string | null };
-type StudentForLogins = { id: string; full_name: string; father_name: string | null; phone: string | null };
+type StudentForLogins = { id: string; full_name: string; father_name: string | null; phone: string | null; reg_no: string | null };
 
 async function callFn(body: Record<string, unknown>): Promise<{ ok?: boolean; error?: string; linked_existing?: boolean }> {
   const { data, error } = await supabase.functions.invoke("manage-users", { body });
@@ -169,9 +169,11 @@ function NewLogin({ role, student, onDone }: { role: "parent" | "student"; stude
     e.preventDefault();
     setErr("");
     if (f.full_name.trim().length < 3) return setErr("Enter the full name.");
-    if (!isValidPhone(f.phone)) return setErr("Enter an 11-digit mobile number, like 0300 1234567.");
+    if (role === "parent" && !isValidPhone(f.phone)) return setErr("Enter an 11-digit mobile number, like 0300 1234567.");
+    if (role === "student" && !student.reg_no) return setErr("Add the registration number first (Edit details).");
+    if (role === "student" && f.password.length < 8) return setErr("Use a password with at least 8 characters.");
     setBusy(true);
-    const r = await callFn({ action: "create", role, student_id: student.id, ...f });
+    const r = await callFn({ action: "create", role, student_id: student.id, ...f, phone: role === "parent" ? f.phone : "" });
     setBusy(false);
     if (r.error) return setErr(r.error);
     onDone();
@@ -180,7 +182,11 @@ function NewLogin({ role, student, onDone }: { role: "parent" | "student"; stude
   return (
     <form onSubmit={save} noValidate className="mt-3 flex flex-col gap-3 rounded-2xl bg-bg p-4">
       <Field label={role === "parent" ? "Parent's name" : "Student's name"} id={`${role}_name`} value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} />
-      <Field label="Phone number (used to sign in)" id={`${role}_phone`} type="tel" inputMode="numeric" placeholder="0300 1234567" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+      {role === "parent" ? (
+        <Field label="Phone number (used to sign in)" id={`${role}_phone`} type="tel" inputMode="numeric" placeholder="0300 1234567" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+      ) : (
+        <p className="text-sm text-sub">Signs in with registration no {student.reg_no ?? "(add it first)"}.</p>
+      )}
       <Field
         label="Password"
         id={`${role}_pw`}
@@ -197,13 +203,13 @@ function NewLogin({ role, student, onDone }: { role: "parent" | "student"; stude
   );
 }
 
-function AccountRow({ a, label, children }: { a: Account; label: string; children?: React.ReactNode }) {
+function AccountRow({ a, label, signIn, children }: { a: Account; label: string; signIn: string; children?: React.ReactNode }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-3 last:border-b-0">
       <span className="flex flex-col">
         <span className="text-[15px]">{a.full_name}</span>
         <span className="text-sm text-sub tabular-nums">
-          {label} · signs in with {a.phone}
+          {label} · signs in with {signIn}
         </span>
       </span>
       <span className="flex flex-wrap gap-2">
@@ -253,7 +259,7 @@ export function Logins({ student, profileId }: { student: StudentForLogins; prof
       {(parents.length > 0 || own) && (
         <ul className="mt-2">
           {parents.map((p) => (
-            <AccountRow key={p.id} a={p} label="Parent">
+            <AccountRow key={p.id} a={p} label="Parent" signIn={p.phone ?? ""}>
               <button
                 type="button"
                 onClick={() => removeParent(p.id)}
@@ -263,7 +269,7 @@ export function Logins({ student, profileId }: { student: StudentForLogins; prof
               </button>
             </AccountRow>
           ))}
-          {own && <AccountRow a={own} label="Student" />}
+          {own && <AccountRow a={own} label="Student" signIn={own.phone ?? `reg no ${student.reg_no ?? ""}`} />}
         </ul>
       )}
       <OkNote>{note}</OkNote>

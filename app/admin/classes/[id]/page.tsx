@@ -10,7 +10,7 @@ import { residenceLabel, type Residence } from "@/lib/fees";
 import { className, pct, toneFor } from "@/lib/school";
 import { loadResults, studentPercent, subjectPercent, subjectsWithTests, type ResultsData } from "@/lib/results";
 
-type Row = { id: string; full_name: string; roll_no: string | null; residence?: Residence };
+type Row = { id: string; full_name: string; roll_no: string | null; reg_no: string | null; residence?: Residence };
 
 function ClassStudents({ classId }: { classId: string }) {
   const [title, setTitle] = useState("");
@@ -22,7 +22,7 @@ function ClassStudents({ classId }: { classId: string }) {
     (async () => {
       const [cls, st, res] = await Promise.all([
         supabase.from("classes").select("name, section").eq("id", classId).maybeSingle(),
-        supabase.from("students").select("id, full_name, roll_no").eq("class_id", classId).eq("status", "active").order("full_name"),
+        supabase.from("students").select("id, full_name, roll_no, reg_no").eq("class_id", classId).eq("status", "active").order("full_name"),
         loadResults({ classId }),
       ]);
       const students = (st.data ?? []) as Row[];
@@ -100,6 +100,7 @@ function ClassStudents({ classId }: { classId: string }) {
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate text-[15px]">{s.full_name}</span>
                       <span className="truncate text-sm text-sub">
+                        {s.reg_no ? `${s.reg_no} · ` : ""}
                         {s.residence ? residenceLabel(s.residence) : "No fee set"}
                         {s.roll_no ? ` · Roll ${s.roll_no}` : ""}
                       </span>
