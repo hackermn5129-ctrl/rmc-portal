@@ -10,6 +10,8 @@ import { ErrorNote, Field, PrimaryButton, SelectField } from "@/components/ui";
 import { loadFeeOverview, type FeeOverview, type StudentLite } from "@/lib/fee-data";
 import { monthLabel, rs } from "@/lib/fees";
 import { className } from "@/lib/school";
+import { VoucherButton, VoucherCard, type VoucherPhoto } from "@/components/voucher-reader";
+import { findVoucher, matchStudents, voucherAmount, voucherMonths } from "@/lib/voucher";
 
 type MonthDue = { fee_record_id: string; month: string; amount_due: number; amount_paid: number };
 const today = () => new Date().toLocaleDateString("en-CA");
@@ -27,6 +29,10 @@ function Pay({ preselect }: { preselect: string | null }) {
   const [paidOn, setPaidOn] = useState(today());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState<VoucherPhoto | null>(null);
+  const [voucherNo, setVoucherNo] = useState("");
+  const [saved, setSaved] = useState<{ receipt_no: number; paid_on: string } | null>(null);
+  const [repeatOk, setRepeatOk] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -41,10 +47,17 @@ function Pay({ preselect }: { preselect: string | null }) {
     };
   }, [preselect]);
 
-  async function choose(s: StudentLite) {
+  // With a voucher photo, the amount, date and voucher number come from the photo and can still be changed.
+  async function choose(s: StudentLite, from: VoucherPhoto | null = photo) {
+    const v = from?.voucher;
     setPicked(s);
     setPhone(s.phone ?? "");
-    setAmount("");
+    setAmount(v && voucherAmount(v) > 0 ? String(voucherAmount(v)) : "");
+    if (v) {
+      setPaidOn(v.date && v.date <= today() ? v.date : today());
+      setVoucherNo(v.voucher_no);
+      setMethod("cash");
+    }
     setError("");
     const { data: rows } = await supabase
       .from("fee_status")
@@ -54,7 +67,23 @@ function Pay({ preselect }: { preselect: string | null }) {
     setMonths(((rows ?? []) as MonthDue[]).filter((r) => Number(r.amount_paid) < Number(r.amount_due)));
   }
 
+  async function onRead(p: VoucherPhoto) {
+    setPhoto(p);
+    setQuery("");
+    setClassFilter("");
+    setRepeatOk("");
+    setSaved(await findVoucher(p.voucher.voucher_no));
+  }
+
+  function clearPhoto() {
+    setPhoto(null);
+    setSaved(null);
+    setVoucherNo("");
+    setRepeatOk("");
+  }
+
   const classById = useMemo(() => new Map((data?.classes ?? []).map((c) => [c.id, c])), [data]);
+  const guess = useMemo(() => (photo && data ? matchStudents(photo.voucher, data.students, data.classes) : null), [photo, data]);
 
   const matches = useMemo(() => {
     if (!data) return [];
@@ -79,26 +108,76 @@ function Pay({ preselect }: { preselect: string | null }) {
     if (!(paying > 0)) return setError("Enter the amount paid now.");
     if (paying > owed) return setError(`That is more than what is due (${rs(owed)}).`);
     if (phone.trim() && !isValidPhone(phone)) return setError("The phone number should be 11 digits, like 0300 1234567.");
+    const vno = voucherNo.trim();
     setBusy(true);
+    if (vno && repeatOk !== vno) {
+      const before = await findVoucher(vno);
+      if (before) {
+        setBusy(false);
+        setRepeatOk(vno);
+        return setError(`Voucher ${vno} was already saved as invoice ${before.receipt_no}. If this is a different booklet, press save again.`);
+      }
+    }
     if (phone.trim() && normalizePhone(phone) !== (picked.phone ?? "")) await supabase.from("students").update({ phone: normalizePhone(phone) }).eq("id", picked.id);
-    const { data: receipt, error } = await supabase.rpc("record_payment", { p_student: picked.id, p_amount: paying, p_paid_on: paidOn, p_method: method });
+    const { data: receipt, error } = await supabase.rpc("record_payment", { p_student: picked.id, p_amount: paying, p_paid_on: paidOn, p_method: method, p_voucher_no: vno || null });
     setBusy(false);
     if (error || !receipt) return setError("The payment wasn't saved. Try again.");
     router.replace(`/admin/fees/receipt/${receipt}`);
   }
 
+  const studentRow = (s: StudentLite) => {
+    const b = data.balances.get(s.id);
+    return (
+      <li key={s.id} className="border-b border-line last:border-b-0">
+        <button type="button" onClick={() => choose(s)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-[15px]">{s.full_name}</span>
+            <span className="truncate text-sm text-sub">
+              {className(classById.get(s.class_id ?? ""))}
+              {s.reg_no ? ` · ${s.reg_no}` : ""}
+              {s.father_name ? ` · s/o ${s.father_name}` : ""}
+              {s.phone ? ` · ${s.phone}` : ""}
+            </span>
+          </span>
+          <span className={`shrink-0 text-sm tabular-nums ${b && b.outstanding > 0 ? "text-warn" : "text-ok"}`}>{b && b.outstanding > 0 ? rs(b.outstanding) : "Paid"}</span>
+        </button>
+      </li>
+    );
+  };
+
   if (!picked)
     return (
       <div className="mt-5 flex flex-col gap-4">
+        {!photo && <VoucherButton onRead={onRead} />}
+        {photo && (
+          <>
+            <VoucherCard photo={photo} onRetake={clearPhoto} />
+            {saved && (
+              <ErrorNote>
+                Voucher {photo.voucher.voucher_no} was already saved as invoice {saved.receipt_no}. Check before adding it again.
+              </ErrorNote>
+            )}
+            <section>
+              <h2 className="text-base font-medium">Who is this student?</h2>
+              {guess && guess.candidates.length > 0 ? (
+                <>
+                  <p className="mt-1 text-sm text-sub">{guess.sure ? "This looks like the right student. Tap to continue." : "Tap the right student."}</p>
+                  <ul className="mt-3 rounded-3xl border border-line bg-white px-4 py-1">{guess.candidates.map((c) => studentRow(c.student))}</ul>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-sub">No student matched the name on the voucher. Find the student below.</p>
+              )}
+            </section>
+          </>
+        )}
         <div className="flex flex-col gap-2">
           <label htmlFor="q" className="text-sm text-sub">
-            Student name or registration no
+            {photo ? "Not in the list? Type the name or registration no" : "Or type the student name or registration no"}
           </label>
           <div className="relative">
             <Search aria-hidden className="absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-sub" strokeWidth={1.75} />
             <input
               id="q"
-              autoFocus
               autoComplete="off"
               placeholder="Name or registration no, like Muhammad"
               value={query}
@@ -118,25 +197,7 @@ function Pay({ preselect }: { preselect: string | null }) {
 
         {matches.length > 0 && (
           <ul className="rounded-3xl border border-line bg-white px-4 py-1">
-            {matches.map((s) => {
-              const b = data.balances.get(s.id);
-              return (
-                <li key={s.id} className="border-b border-line last:border-b-0">
-                  <button type="button" onClick={() => choose(s)} className="flex w-full items-center justify-between gap-3 py-3 text-left">
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-[15px]">{s.full_name}</span>
-                      <span className="truncate text-sm text-sub">
-                        {className(classById.get(s.class_id ?? ""))}
-                        {s.reg_no ? ` · ${s.reg_no}` : ""}
-                        {s.father_name ? ` · s/o ${s.father_name}` : ""}
-                        {s.phone ? ` · ${s.phone}` : ""}
-                      </span>
-                    </span>
-                    <span className={`shrink-0 text-sm tabular-nums ${b && b.outstanding > 0 ? "text-warn" : "text-ok"}`}>{b && b.outstanding > 0 ? rs(b.outstanding) : "Paid"}</span>
-                  </button>
-                </li>
-              );
-            })}
+            {matches.map(studentRow)}
           </ul>
         )}
         {(query.trim().length >= 2 || classFilter) && matches.length === 0 && <p className="text-sm text-sub">No student matches that.</p>}
@@ -145,6 +206,7 @@ function Pay({ preselect }: { preselect: string | null }) {
 
   return (
     <form onSubmit={save} noValidate className="mt-5 flex flex-col gap-4">
+      {photo && <VoucherCard photo={photo} />}
       <section className="rounded-[28px] border border-line bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -199,10 +261,13 @@ function Pay({ preselect }: { preselect: string | null }) {
             </SelectField>
             <Field label="Date" id="paid_on" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
           </div>
+          <Field label="Voucher no (from the booklet)" id="voucher_no" inputMode="numeric" placeholder="1953" value={voucherNo} onChange={(e) => setVoucherNo(e.target.value)} />
+          {photo && voucherMonths(photo.voucher) && <p className="text-sm text-sub">The voucher says this fee is for {voucherMonths(photo.voucher)}.</p>}
+          {paying > owed && <p className="text-sm text-warn">That is more than what is due ({rs(owed)}). Check the amount and the student.</p>}
           <p className="text-sm text-sub">Older months are paid off first.</p>
           <ErrorNote>{error}</ErrorNote>
           <PrimaryButton type="submit" busy={busy}>
-            Save and make invoice
+            {photo ? "Confirm, save and make invoice" : "Save and make invoice"}
           </PrimaryButton>
         </section>
       )}

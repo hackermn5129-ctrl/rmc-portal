@@ -7,7 +7,7 @@ import { WithId } from "@/components/route";
 import { monthLabel, rs } from "@/lib/fees";
 import { className, waNumber } from "@/lib/school";
 
-type Line = { amount: number; paid_on: string; method: string | null; fee_records: { month: string; student_id: string; amount_due: number } };
+type Line = { amount: number; paid_on: string; method: string | null; voucher_no: string | null; fee_records: { month: string; student_id: string; amount_due: number } };
 type Info = {
   lines: Line[];
   student: { id: string; full_name: string; father_name: string | null; phone: string | null; roll_no: string | null; reg_no: string | null; classes: { name: string; section: string } | null };
@@ -17,7 +17,7 @@ type Info = {
 async function loadReceipt(no: string): Promise<Info | null> {
   const { data: lines } = await supabase
     .from("fee_payments")
-    .select("amount, paid_on, method, fee_records(month, student_id, amount_due)")
+    .select("amount, paid_on, method, voucher_no, fee_records(month, student_id, amount_due)")
     .eq("receipt_no", Number(no));
   const first = (lines as unknown as Line[] | null)?.[0];
   if (!first) return null;
@@ -75,6 +75,12 @@ function Receipt({ no }: { no: string }) {
         <dl className="mt-4 grid grid-cols-2 gap-y-2.5 text-sm">
           <dt className="text-sub">Invoice no</dt>
           <dd className="tabular-nums">{no}</dd>
+          {info.lines[0].voucher_no && (
+            <>
+              <dt className="text-sub">Voucher no</dt>
+              <dd className="tabular-nums">{info.lines[0].voucher_no}</dd>
+            </>
+          )}
           <dt className="text-sub">Date</dt>
           <dd>{date}</dd>
           <dt className="text-sub">Student</dt>
