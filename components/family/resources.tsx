@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ExternalLink, Library, ListChecks, MessageSquareText, ScrollText } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, FileText, Library, ListChecks, MessageSquareText, ScrollText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { classGrades, type Chapter } from "@/lib/chapters";
 import { LETTERS } from "@/lib/mcq";
@@ -9,25 +9,28 @@ import { ChapterHeader, ChapterList, OptionGrid, SubjectGrid, SubjectHeader, Ur,
 import { BackRow } from "./learn";
 import type { Ctx } from "./shell";
 
-export type Kind = "short" | "long" | "mcq" | "ebook";
+export type Kind = "short" | "long" | "mcq" | "ebook" | "papers";
 const KINDS: Record<Kind, { label: string; urdu: string; Icon: typeof Library; bg: string; fg: string }> = {
   short: { label: "Short questions", urdu: "مختصر سوالات", Icon: MessageSquareText, bg: "#E4ECFA", fg: "#2856A8" },
   long: { label: "Long questions", urdu: "تفصیلی سوالات", Icon: ScrollText, bg: "#F3E6F7", fg: "#7B3A96" },
   mcq: { label: "Practice MCQs", urdu: "معروضی سوالات", Icon: ListChecks, bg: "#E3F2EA", fg: "#1F7A4D" },
   ebook: { label: "E-books", urdu: "درسی کتابیں", Icon: Library, bg: "#FCEBDD", fg: "#B4561A" },
+  papers: { label: "Past papers", urdu: "بورڈ کے پرچے", Icon: FileText, bg: "#FBF0D2", fg: "#8A6100" },
 };
 
 type Ebook = { id: string; grade: number; title: string; url: string; source: string };
+type Paper = { id: string; grade: number; board: string; year: number; syllabus: "old" | "new"; title: string; file_url: string };
 type StudyQ = { id: string; chapter_id: string; kind: "short" | "long"; question: string; answer: string };
 const isPreview = (u: string) => /drive\.google\.com\/file\/d\/[^/]+\/preview/.test(u);
 
-export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId }: { ctx: Ctx; subjectId: string | null; kind: Kind | null; chapterId: string | null; bookId: string | null }) {
+export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId = null }: { ctx: Ctx; subjectId: string | null; kind: Kind | null; chapterId: string | null; bookId: string | null; paperId?: string | null }) {
   const { child, base } = ctx;
   const subjects = useClassSubjects(child.class_id);
   const chapters = useChapters(child.class_id, subjectId);
   const [books, setBooks] = useState<Ebook[] | null>(null);
   const [qs_, setQs] = useState<StudyQ[] | null>(null);
   const [mcqCounts, setMcqCounts] = useState<Map<string, number>>(new Map());
+  const [papers, setPapers] = useState<Paper[] | null>(null);
 
   const href = (p: Record<string, string | null>) => `${base}/resources${qs(p)}`;
 
@@ -36,12 +39,22 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId }: { ctx:
     if (!child.class_id || !subjectId) return;
     (async () => {
       const grades = await classGrades(child.class_id!);
-      const [b, m] = await Promise.all([
+      const [b, m, pp] = await Promise.all([
         supabase.from("ebooks").select("id, grade, title, url, source").eq("subject_id", subjectId).in("grade", grades.length ? grades : [0]).order("grade").order("title"),
         supabase.rpc("bank_mcq_counts", { p_class: child.class_id, p_subject: subjectId }),
+        supabase
+          .from("past_papers")
+          .select("id, grade, board, year, syllabus, title, file_url")
+          .eq("subject_id", subjectId)
+          .in("grade", grades.length ? grades : [0])
+          .not("file_url", "is", null)
+          .order("year", { ascending: false })
+          .order("board")
+          .order("title"),
       ]);
       if (!active) return;
       setBooks((b.data ?? []) as Ebook[]);
+      setPapers((pp.data ?? []) as Paper[]);
       setMcqCounts(new Map(((m.data ?? []) as { chapter_id: string; n: number }[]).map((r) => [r.chapter_id, r.n])));
     })();
     return () => {
@@ -83,7 +96,7 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId }: { ctx:
       </>
     );
 
-  if (!chapters || !books || !qs_) return <p className="mt-6 text-sm text-sub">Loading</p>;
+  if (!chapters || !books || !qs_ || !papers) return <p className="mt-6 text-sm text-sub">Loading</p>;
   const twoBooks = new Set(chapters.map((c) => c.grade)).size > 1;
   const count = (k: "short" | "long", c?: Chapter) => qs_.filter((q) => q.kind === k && (!c || q.chapter_id === c.id)).length;
   const mcqTotal = [...mcqCounts.values()].reduce((a, b) => a + b, 0);
@@ -94,16 +107,22 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId }: { ctx:
         <BackRow href={href({})} label="All subjects" />
         <SubjectHeader name={subject.name} line="What do you want to study?" />
         <OptionGrid
-          items={(Object.keys(KINDS) as Kind[]).map((k) => ({
-            href: href({ s: subject.id, k }),
-            ...KINDS[k],
-            note: k === "ebook" ? `${books.length} ${books.length === 1 ? "book" : "books"}` : k === "mcq" ? `${mcqTotal} MCQs` : `${count(k)} questions`,
-          }))}
+          items={(Object.keys(KINDS) as Kind[])
+            .filter((k) => k !== "papers" || papers.length > 0)
+            .map((k) => ({
+              href: href({ s: subject.id, k }),
+              ...KINDS[k],
+              note:
+                k === "ebook" ? `${books.length} ${books.length === 1 ? "book" : "books"}` : k === "papers" ? `${papers.length} papers` : k === "mcq" ? `${mcqTotal} MCQs` : `${count(k as "short" | "long")} questions`,
+            }))}
         />
       </>
     );
 
   const info = KINDS[kind];
+
+  if (kind === "papers")
+    return <PastPapers papers={papers} paperId={paperId} subjectName={subject.name} hrefFor={(p) => href({ s: subject.id, k: "papers", ...p })} backHref={href({ s: subject.id })} />;
 
   if (kind === "ebook") {
     const book = books.find((b) => b.id === bookId);
@@ -295,5 +314,99 @@ function PracticeMcqs({ chapterId }: { chapterId: string }) {
         )}
       </div>
     </>
+  );
+}
+
+// The school's own board: shown first.
+const HOME_BOARD = "Sahiwal";
+
+// Board past papers: pick a board, then a paper by year. A paper opens inside the page.
+function PastPapers({ papers, paperId, subjectName, hrefFor, backHref }: { papers: Paper[]; paperId: string | null; subjectName: string; hrefFor: (p: Record<string, string | null>) => string; backHref: string }) {
+  const boards = [...new Set(papers.map((p) => p.board))].sort((a, b) => (a === HOME_BOARD ? -1 : b === HOME_BOARD ? 1 : a.localeCompare(b)));
+  const [board, setBoard] = useState<string>(boards.includes(HOME_BOARD) ? HOME_BOARD : "all");
+  const info = KINDS.papers;
+  const paper = papers.find((p) => p.id === paperId);
+
+  if (paper) {
+    const viewer = `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(paper.file_url)}`;
+    return (
+      <>
+        <BackRow href={hrefFor({})} label="Past papers" />
+        <p className="mt-4 text-[15px] font-medium">{paper.title}</p>
+        <SyllabusTag syllabus={paper.syllabus} />
+        <iframe src={viewer} title={paper.title} className="mt-3 h-[75vh] w-full rounded-2xl border border-line bg-white" />
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <a href={paper.file_url} target="_blank" rel="noopener noreferrer" className="flex h-12 items-center justify-center gap-2 rounded-full border border-line-strong bg-white text-[15px] font-medium">
+            Open full size
+            <ExternalLink aria-hidden className="size-4" strokeWidth={1.75} />
+          </a>
+          <a href={paper.file_url} download className="flex h-12 items-center justify-center gap-2 rounded-full bg-navy text-[15px] font-medium text-white">
+            Download
+            <Download aria-hidden className="size-4" strokeWidth={1.75} />
+          </a>
+        </div>
+        <p className="mt-2 text-[13px] text-sub">If the paper does not show above, tap Open full size.</p>
+      </>
+    );
+  }
+
+  const shown = board === "all" ? papers : papers.filter((p) => p.board === board);
+  const years = [...new Set(shown.map((p) => p.year))].sort((a, b) => b - a);
+  const chip = (on: boolean) => `shrink-0 rounded-full border px-4 py-2 text-sm transition-colors ${on ? "border-navy bg-navy text-white" : "border-line-strong bg-white text-ink"}`;
+
+  return (
+    <>
+      <BackRow href={backHref} label={subjectName} />
+      <SubjectHeader name={subjectName} line={`${info.label} · ${papers.length} board papers`} />
+      <div className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
+        {boards.map((b) => (
+          <button key={b} type="button" aria-pressed={board === b} onClick={() => setBoard(b)} className={chip(board === b)}>
+            {b}
+            {b === HOME_BOARD ? " · our board" : ""}
+          </button>
+        ))}
+        <button type="button" aria-pressed={board === "all"} onClick={() => setBoard("all")} className={chip(board === "all")}>
+          All boards
+        </button>
+      </div>
+      {years.map((y) => (
+        <section key={y} className="mt-5">
+          <h3 className="text-sm font-medium text-sub">{y}</h3>
+          <ul className="mt-2 flex flex-col gap-2">
+            {shown
+              .filter((p) => p.year === y)
+              .map((p) => (
+                <li key={p.id}>
+                  <Link href={hrefFor({ p: p.id })} className="flex items-center gap-3 rounded-3xl border border-line bg-white p-4">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl" style={{ background: info.bg, color: info.fg }}>
+                      <FileText aria-hidden className="size-6" strokeWidth={1.75} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-medium">
+                        {p.board} Board {p.year}
+                      </span>
+                      <span className="block text-[13px] text-sub">{p.title.split(" · ").slice(2).join(" · ") || "Full paper"} · Tap to open</span>
+                    </span>
+                    <SyllabusTag syllabus={p.syllabus} small />
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        </section>
+      ))}
+      <p className="mt-5 text-[13px] leading-relaxed text-sub">Old syllabus papers are from before the new Punjab books. The question style is still useful practice, but some topics may have changed.</p>
+    </>
+  );
+}
+
+function SyllabusTag({ syllabus, small = false }: { syllabus: "old" | "new"; small?: boolean }) {
+  const old = syllabus === "old";
+  return (
+    <span
+      className={`inline-block shrink-0 rounded-full font-medium ${small ? "px-2.5 py-1 text-[12px]" : "mt-1 px-3 py-1 text-[13px]"}`}
+      style={{ background: old ? "#FBF0D2" : "#E3F2EA", color: old ? "#8A6100" : "#1F7A4D" }}
+    >
+      {old ? "Old syllabus" : "New syllabus"}
+    </span>
   );
 }
