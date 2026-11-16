@@ -19,7 +19,7 @@ const KINDS: Record<Kind, { label: string; urdu: string; Icon: typeof Library; b
 };
 
 type Ebook = { id: string; grade: number; title: string; url: string; source: string };
-type Paper = { id: string; grade: number; board: string; year: number; syllabus: "old" | "new"; title: string; file_url: string };
+type Paper = { id: string; grade: number; board: string; year: number; syllabus: "old" | "new"; title: string; file_url: string; file_type: "pdf" | "image" };
 type StudyQ = { id: string; chapter_id: string; kind: "short" | "long"; question: string; answer: string };
 const isPreview = (u: string) => /drive\.google\.com\/file\/d\/[^/]+\/preview/.test(u);
 
@@ -44,7 +44,7 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId 
         supabase.rpc("bank_mcq_counts", { p_class: child.class_id, p_subject: subjectId }),
         supabase
           .from("past_papers")
-          .select("id, grade, board, year, syllabus, title, file_url")
+          .select("id, grade, board, year, syllabus, title, file_url, file_type")
           .eq("subject_id", subjectId)
           .in("grade", grades.length ? grades : [0])
           .not("file_url", "is", null)
@@ -334,7 +334,12 @@ function PastPapers({ papers, paperId, subjectName, hrefFor, backHref }: { paper
         <BackRow href={hrefFor({})} label="Past papers" />
         <p className="mt-4 text-[15px] font-medium">{paper.title}</p>
         <SyllabusTag syllabus={paper.syllabus} />
-        <iframe src={viewer} title={paper.title} className="mt-3 h-[75vh] w-full rounded-2xl border border-line bg-white" />
+        {paper.file_type === "image" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={paper.file_url} alt={paper.title} className="mt-3 w-full rounded-2xl border border-line bg-white" />
+        ) : (
+          <iframe src={viewer} title={paper.title} className="mt-3 h-[75vh] w-full rounded-2xl border border-line bg-white" />
+        )}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <a href={paper.file_url} target="_blank" rel="noopener noreferrer" className="flex h-12 items-center justify-center gap-2 rounded-full border border-line-strong bg-white text-[15px] font-medium">
             Open full size
@@ -345,7 +350,7 @@ function PastPapers({ papers, paperId, subjectName, hrefFor, backHref }: { paper
             <Download aria-hidden className="size-4" strokeWidth={1.75} />
           </a>
         </div>
-        <p className="mt-2 text-[13px] text-sub">If the paper does not show above, tap Open full size.</p>
+        <p className="mt-2 text-[13px] text-sub">{paper.file_type === "image" ? "Tap Open full size to zoom in." : "If the paper does not show above, tap Open full size."}</p>
       </>
     );
   }

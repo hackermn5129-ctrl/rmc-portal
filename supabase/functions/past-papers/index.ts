@@ -1,7 +1,7 @@
 // Brings board past papers into the school's Cloudflare R2 storage.
 // Called only by the database (pg_net) with a one-time key from paper_import_keys.
 //   { key, action: "scan", urls: [...] }   reads each page and saves the links it finds in paper_scans
-//   { key, action: "import", limit }       downloads pending paper_import_jobs into R2 and lists them in past_papers
+//   { key, action: "import", limit }       downloads pending paper_import_jobs (PDFs or page images) into R2 and lists them in past_papers
 //   { key, action: "move", limit }         moves papers saved earlier in Supabase storage over to R2
 // R2 keys are Edge Function secrets (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY); account, bucket and
 // public link are in paper_storage_config. Work runs in the background; results are read back from the tables.
@@ -58,29 +58,38 @@ async function r2(): Promise<R2> {
   };
 }
 
-async function putR2(store: R2, key: string, bytes: Uint8Array) {
-  const r = await store.client.fetch(`${store.endpoint}/${key}`, { method: "PUT", body: bytes, headers: { "Content-Type": "application/pdf" } });
+async function putR2(store: R2, key: string, bytes: Uint8Array, contentType = "application/pdf") {
+  const r = await store.client.fetch(`${store.endpoint}/${key}`, { method: "PUT", body: bytes, headers: { "Content-Type": contentType } });
   if (!r.ok) throw new Error(`R2 upload: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   return `${store.publicBase}/${key}`;
 }
 
 const isPdf = (b: Uint8Array) => b.length > 1000 && new TextDecoder().decode(b.slice(0, 5)) === "%PDF-";
+// JPEG starts FF D8 FF, PNG starts 89 50 4E 47.
+const imageType = (b: Uint8Array) =>
+  b.length > 5000 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff ? "jpg" : b.length > 5000 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 ? "png" : null;
 
-async function keyFor(job: { url: string; grade: number; subject_id: string; board: string; year: number }) {
+async function keyFor(job: { url: string; grade: number; subject_id: string; board: string; year: number }, ext = "pdf") {
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(job.url)))).slice(0, 6).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${job.grade}/${job.subject_id}/${job.year}/${job.board.toLowerCase().replace(/[^a-z]+/g, "-")}-${hash}.pdf`;
+  return `${job.grade}/${job.subject_id}/${job.year}/${job.board.toLowerCase().replace(/[^a-z]+/g, "-")}-${hash}.${ext}`;
 }
 
-async function importOne(store: R2, job: { url: string; grade: number; subject_id: string; board: string; year: number; syllabus: string; title: string }) {
+async function importOne(store: R2, job: { url: string; grade: number; subject_id: string; board: string; year: number; syllabus: string; title: string; file_type: string }) {
   try {
     const r = await fetch(job.url, { headers: UA });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const bytes = new Uint8Array(await r.arrayBuffer());
-    if (!isPdf(bytes)) throw new Error("Not a PDF");
-    const key = await keyFor(job);
-    const fileUrl = await putR2(store, key, bytes);
+    let fileUrl: string;
+    if (job.file_type === "image") {
+      const ext = imageType(bytes);
+      if (!ext) throw new Error("Not an image");
+      fileUrl = await putR2(store, await keyFor(job, ext), bytes, ext === "png" ? "image/png" : "image/jpeg");
+    } else {
+      if (!isPdf(bytes)) throw new Error("Not a PDF");
+      fileUrl = await putR2(store, await keyFor(job), bytes);
+    }
     const row = await db.from("past_papers").upsert(
-      { grade: job.grade, subject_id: job.subject_id, board: job.board, year: job.year, syllabus: job.syllabus, title: job.title, storage_path: null, file_url: fileUrl, file_size: bytes.length, source_url: job.url },
+      { grade: job.grade, subject_id: job.subject_id, board: job.board, year: job.year, syllabus: job.syllabus, title: job.title, storage_path: null, file_url: fileUrl, file_type: job.file_type, file_size: bytes.length, source_url: job.url },
       { onConflict: "source_url" },
     );
     if (row.error) throw new Error(row.error.message);
