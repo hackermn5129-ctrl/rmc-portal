@@ -17,6 +17,8 @@ const TABS: { v: Tab; label: string }[] = [
   { v: "ebook", label: "E-book" },
 ];
 const dirOf = (s: string) => (isUrdu(s) ? "rtl" : undefined);
+// "★★★ Asked 12× · " before the answer line.
+const asked = (n: number | null) => (n ? `${n > 10 ? "★★★ " : n >= 5 ? "★ " : ""}Asked ${n}× · ` : "");
 
 // "Q: … / A: …" blocks with an empty line between them.
 function parseQA(text: string) {
@@ -83,11 +85,11 @@ function Resources({ teacherId }: { teacherId: string }) {
         const { data } = await supabase.from("ebooks").select("id, title, grade, source").eq("subject_id", sel.subjectId).in("grade", grades).order("grade");
         rows = (data ?? []).map((b) => ({ id: b.id, title: b.title, sub: `Class ${b.grade} book · ${b.source}` }));
       } else if (tab === "mcq" && chapterId) {
-        const { data } = await supabase.from("bank_mcqs").select("id, question, options, correct").eq("chapter_id", chapterId).order("created_at");
-        rows = (data ?? []).map((q) => ({ id: q.id, title: q.question, sub: `Answer: ${LETTERS[q.correct]}) ${q.options[q.correct]}` }));
+        const { data } = await supabase.from("bank_mcqs").select("id, question, options, correct, times_asked").eq("chapter_id", chapterId).order("times_asked", { ascending: false }).order("created_at");
+        rows = (data ?? []).map((q) => ({ id: q.id, title: q.question, sub: `${asked(q.times_asked)}Answer: ${LETTERS[q.correct]}) ${q.options[q.correct]}` }));
       } else if ((tab === "short" || tab === "long") && chapterId) {
-        const { data } = await supabase.from("study_questions").select("id, question, answer").eq("chapter_id", chapterId).eq("kind", tab).order("position").order("created_at");
-        rows = (data ?? []).map((q) => ({ id: q.id, title: q.question, sub: q.answer ? q.answer.slice(0, 120) : "No answer yet" }));
+        const { data } = await supabase.from("study_questions").select("id, question, answer, times_asked").eq("chapter_id", chapterId).eq("kind", tab).order("times_asked", { ascending: false }).order("position").order("created_at");
+        rows = (data ?? []).map((q) => ({ id: q.id, title: q.question, sub: `${asked(q.times_asked)}${q.answer ? q.answer.slice(0, 120) : "No answer yet"}` }));
       }
       if (active) setItems(rows);
     })();

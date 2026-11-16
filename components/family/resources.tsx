@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { classGrades, type Chapter } from "@/lib/chapters";
 import { LETTERS } from "@/lib/mcq";
 import { ChapterHeader, ChapterList, OptionGrid, SubjectGrid, SubjectHeader, Ur, qs, useChapters, useClassSubjects } from "@/components/learn/kit";
+import { AskedBadge, LevelHeading, cardBorder, levelOf, sourcesLine, type Level } from "@/components/learn/asked";
 import { BackRow } from "./learn";
 import type { Ctx } from "./shell";
 
@@ -20,7 +21,7 @@ const KINDS: Record<Kind, { label: string; urdu: string; Icon: typeof Library; b
 
 type Ebook = { id: string; grade: number; title: string; url: string; source: string };
 type Paper = { id: string; grade: number; board: string; year: number; syllabus: "old" | "new"; title: string; file_url: string; file_type: "pdf" | "image" };
-type StudyQ = { id: string; chapter_id: string; kind: "short" | "long"; question: string; answer: string };
+type StudyQ = { id: string; chapter_id: string; kind: "short" | "long"; question: string; answer: string; times_asked: number; sources: string[] };
 const isPreview = (u: string) => /drive\.google\.com\/file\/d\/[^/]+\/preview/.test(u);
 
 export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId = null }: { ctx: Ctx; subjectId: string | null; kind: Kind | null; chapterId: string | null; bookId: string | null; paperId?: string | null }) {
@@ -72,8 +73,9 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId 
     }
     supabase
       .from("study_questions")
-      .select("id, chapter_id, kind, question, answer")
+      .select("id, chapter_id, kind, question, answer, times_asked, sources")
       .in("chapter_id", ids)
+      .order("times_asked", { ascending: false })
       .order("position")
       .order("created_at")
       .then(({ data }) => active && setQs((data ?? []) as StudyQ[]));
@@ -202,33 +204,56 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId 
 
 function QuestionList({ list }: { list: StudyQ[] }) {
   if (!list.length) return <p className="mt-3 rounded-3xl border border-line bg-white p-4 text-sm text-sub">No questions for this chapter yet. Your teacher will add them.</p>;
+  const sorted = [...list].sort((a, b) => (b.times_asked ?? 1) - (a.times_asked ?? 1));
+  const groups = (["top", "high", "normal"] as Level[]).map((lv) => ({ lv, items: sorted.filter((q) => levelOf(q.times_asked ?? 1) === lv) })).filter((g) => g.items.length);
+  let n = 0;
   return (
-    <ol className="mt-3 flex flex-col gap-2">
-      {list.map((q, i) => (
-        <li key={q.id}>
-          <details className="group rounded-[24px] border border-line bg-white p-4 open:border-line-strong">
-            <summary className="flex cursor-pointer list-none items-start gap-3">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-bg text-[13px] font-medium tabular-nums text-navy">{i + 1}</span>
-              <span className="min-w-0 flex-1 text-[15px] font-medium">
-                <Ur text={q.question} />
-              </span>
-              <ChevronDown aria-hidden className="mt-1 size-4 shrink-0 text-sub transition-transform group-open:rotate-180" strokeWidth={1.75} />
-            </summary>
-            {q.answer ? (
-              <p className="mt-3 whitespace-pre-line border-t border-line pt-3 text-[15px] leading-relaxed text-ink/90">
-                <Ur text={q.answer} />
-              </p>
-            ) : (
-              <p className="mt-3 border-t border-line pt-3 text-sm text-sub">No answer written yet.</p>
-            )}
-          </details>
-        </li>
+    <>
+      <p className="mt-3 rounded-2xl bg-bg px-3 py-2 text-[13px] leading-relaxed text-sub">
+        The number on each question shows how many times it came in Punjab board papers. Learn the starred ones first.
+      </p>
+      {groups.map((g) => (
+        <section key={g.lv}>
+          {groups.length > 1 || g.lv !== "normal" ? <LevelHeading level={g.lv} count={g.items.length} /> : null}
+          <ol className="mt-2 flex flex-col gap-2">
+            {g.items.map((q) => {
+              n += 1;
+              const times = q.times_asked ?? 1;
+              return (
+                <li key={q.id}>
+                  <details className="group rounded-[24px] border border-line bg-white p-4 open:border-line-strong" style={cardBorder(times) ? { borderColor: cardBorder(times), borderWidth: 2 } : undefined}>
+                    <summary className="flex cursor-pointer list-none items-start gap-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-bg text-[13px] font-medium tabular-nums text-navy">{n}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-medium">
+                          <Ur text={q.question} />
+                        </span>
+                        <span className="mt-1.5 block">
+                          <AskedBadge n={times} />
+                        </span>
+                      </span>
+                      <ChevronDown aria-hidden className="mt-1 size-4 shrink-0 text-sub transition-transform group-open:rotate-180" strokeWidth={1.75} />
+                    </summary>
+                    {q.answer ? (
+                      <p className="mt-3 whitespace-pre-line border-t border-line pt-3 text-[15px] leading-relaxed text-ink/90">
+                        <Ur text={q.answer} />
+                      </p>
+                    ) : (
+                      <p className="mt-3 border-t border-line pt-3 text-sm text-sub">No answer written yet.</p>
+                    )}
+                    {q.sources?.length ? <p className="mt-2 text-[12px] leading-relaxed text-sub">Came in: {sourcesLine(q.sources, 6)}</p> : null}
+                  </details>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
       ))}
-    </ol>
+    </>
   );
 }
 
-type PQ = { id: string; question: string; options: string[]; correct: number; explanation: string | null };
+type PQ = { id: string; question: string; options: string[]; correct: number; explanation: string | null; times_asked: number | null; sources: string[] | null };
 
 // One question at a time. Tap an answer to see if it is right.
 function PracticeMcqs({ chapterId }: { chapterId: string }) {
@@ -264,7 +289,15 @@ function PracticeMcqs({ chapterId }: { chapterId: string }) {
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
         <div className="h-full rounded-full bg-navy transition-all" style={{ width: `${((i + 1) / list.length) * 100}%` }} />
       </div>
-      <section className="mt-3 rounded-[24px] border border-line bg-white p-4">
+      <section className="mt-3 rounded-[24px] border border-line bg-white p-4" style={cardBorder(q.times_asked ?? 1) ? { borderColor: cardBorder(q.times_asked ?? 1), borderWidth: 2 } : undefined}>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <AskedBadge n={q.times_asked ?? 1} />
+          {levelOf(q.times_asked ?? 1) !== "normal" && (
+            <span className="text-[12px] font-medium" style={{ color: levelOf(q.times_asked ?? 1) === "top" ? "#B3261E" : "#8A6100" }}>
+              {levelOf(q.times_asked ?? 1) === "top" ? "Most important" : "Important"}
+            </span>
+          )}
+        </div>
         <p className="text-[16px] font-medium">
           <Ur text={q.question} />
         </p>
@@ -289,6 +322,7 @@ function PracticeMcqs({ chapterId }: { chapterId: string }) {
                 <Ur text={q.explanation} />
               </span>
             )}
+            {q.sources?.length ? <span className="mt-1 block text-[12px] text-sub">Came in: {sourcesLine(q.sources)}</span> : null}
           </p>
         )}
       </section>
