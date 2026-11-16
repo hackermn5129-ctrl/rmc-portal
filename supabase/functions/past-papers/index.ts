@@ -3,6 +3,7 @@
 //   { key, action: "scan", urls: [...] }   reads each page and saves the links it finds in paper_scans
 //   { key, action: "import", limit }       downloads pending paper_import_jobs (PDFs or page images) into R2 and lists them in past_papers
 //   { key, action: "move", limit }         moves papers saved earlier in Supabase storage over to R2
+//   { key, action: "manifest" }            writes papers.json (every paper's class, subject, board, year, title, link) to R2
 // R2 keys are Edge Function secrets (R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY); account, bucket and
 // public link are in paper_storage_config. Work runs in the background; results are read back from the tables.
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -125,6 +126,25 @@ async function runMove(limit: number) {
   }
 }
 
+// A list of every paper, so a copy can be made elsewhere (for example a Google Drive folder).
+async function runManifest() {
+  const store = await r2();
+  const { data, error } = await db.from("past_papers").select("grade, board, year, syllabus, title, file_url, file_type, subjects(name)").order("grade").order("year");
+  if (error) throw new Error(error.message);
+  const list = (data ?? []).map((p) => ({
+    grade: p.grade,
+    // @ts-ignore joined row
+    subject: p.subjects?.name ?? "",
+    board: p.board,
+    year: p.year,
+    syllabus: p.syllabus,
+    title: p.title,
+    url: p.file_url,
+    type: p.file_type,
+  }));
+  await putR2(store, "papers.json", new TextEncoder().encode(JSON.stringify(list)), "application/json");
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("POST only", { status: 405 });
   const body = await req.json().catch(() => ({}));
@@ -133,7 +153,7 @@ Deno.serve(async (req) => {
 
   const limit = Math.min(Number(body.limit) || 20, 40);
   const work =
-    body.action === "scan" ? scan((body.urls ?? []).slice(0, 40)) : body.action === "import" ? runImport(limit) : body.action === "move" ? runMove(limit) : null;
+    body.action === "scan" ? scan((body.urls ?? []).slice(0, 40)) : body.action === "import" ? runImport(limit) : body.action === "move" ? runMove(limit) : body.action === "manifest" ? runManifest() : null;
   if (!work) return new Response("Unknown action", { status: 400 });
   // @ts-ignore EdgeRuntime is provided by Supabase
   EdgeRuntime.waitUntil(work.catch((e) => console.error(String(e))));
