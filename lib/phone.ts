@@ -25,3 +25,13 @@ export function isRegNo(raw: string): boolean {
 export function regToLoginId(raw: string): string {
   return `r${raw.replace(/\D/g, "").padStart(6, "0")}@${LOGIN_DOMAIN}`;
 }
+
+// A few accounts (for example test accounts) sign in with a username like "Student16".
+// Spaces and capital letters do not matter: "Parent 16" is the same as "parent16".
+export function isUsername(raw: string): boolean {
+  return /^[a-z][a-z0-9._-]{2,31}$/.test(raw.replace(/\s/g, "").toLowerCase());
+}
+
+export function usernameToLoginId(raw: string): string {
+  return `u-${raw.replace(/\s/g, "").toLowerCase()}@${LOGIN_DOMAIN}`;
+}
