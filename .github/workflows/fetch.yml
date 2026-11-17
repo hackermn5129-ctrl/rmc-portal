@@ -9,7 +9,9 @@ jobs:
     permissions: { contents: write }
     steps:
       - uses: actions/checkout@v4
-      - run: |
+      - shell: bash {0}
+        run: |
+          set -x
           mkdir -p out
           while read -r name url; do
             [ -z "$name" ] && continue
@@ -18,4 +20,4 @@ jobs:
           done < fetch/urls.txt
           git config user.name bot; git config user.email bot@users.noreply.github.com
           git checkout --orphan papers-cache
-          git rm -rq --cached . ; git add out; git commit -qm cache; git push -f origin papers-cache
+          git rm -rq --cached . ; git add out; git commit -qm cache; git push -f origin papers-cache || git push -f origin HEAD:refs/heads/papers-cache
