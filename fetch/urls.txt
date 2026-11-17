@@ -13,4 +13,3 @@ mtn25-1st.html https://web.bisemultan.edu.pk/question-papers-with-key-matric-1st
 mtn25-2nd.html https://web.bisemultan.edu.pk/question-papers-ssc-part-i-1st-annual-2025-9th-examination/
 fg-index.html https://fgstudy.com/past-paper/9th/subject-wise/9th-class-biology-past-papers.html
 ebpk-index.html https://ebooks.pk/education/punjab/class-9/biology/past-papers
-# retry

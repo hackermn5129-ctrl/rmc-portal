@@ -20,4 +20,4 @@ jobs:
           done < fetch/urls.txt
           git config user.name bot; git config user.email bot@users.noreply.github.com
           git checkout --orphan papers-cache
-          git rm -rq --cached . ; git add out; git commit -qm cache; git push -f origin papers-cache || git push -f origin HEAD:refs/heads/papers-cache
+          git rm -rq --cached . ; git add -f out; git commit -qm cache; git push -f origin papers-cache || git push -f origin HEAD:refs/heads/papers-cache
