@@ -1,4 +1,5 @@
 "use client";
+import { plainAnswer } from "@/components/learn/answer";
 import { useEffect, useState } from "react";
 import { Check, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -88,8 +89,10 @@ function Resources({ teacherId }: { teacherId: string }) {
         const { data } = await supabase.from("bank_mcqs").select("id, question, options, correct, times_asked").eq("chapter_id", chapterId).order("times_asked", { ascending: false }).order("created_at");
         rows = (data ?? []).map((q) => ({ id: q.id, title: q.question, sub: `${asked(q.times_asked)}Answer: ${LETTERS[q.correct]}) ${q.options[q.correct]}` }));
       } else if ((tab === "short" || tab === "long") && chapterId) {
-        const { data } = await supabase.from("study_questions").select("id, question, answer, times_asked").eq("chapter_id", chapterId).eq("kind", tab).order("times_asked", { ascending: false }).order("position").order("created_at");
-        rows = (data ?? []).map((q) => ({ id: q.id, title: q.question, sub: `${asked(q.times_asked)}${q.answer ? q.answer.slice(0, 120) : "No answer yet"}` }));
+        const { data } = await supabase.from("study_questions").select("id, question, answer, times_asked, old_book, is_exercise").eq("chapter_id", chapterId).eq("kind", tab).order("times_asked", { ascending: false }).order("position").order("created_at");
+        rows = [...(data ?? [])]
+          .sort((a, b) => Number(a.old_book) - Number(b.old_book))
+          .map((q) => ({ id: q.id, title: q.question, sub: q.old_book ? "From old book · not in the new course" : `${q.is_exercise ? "Exercise · " : ""}${q.times_asked ? asked(q.times_asked) : ""}${q.answer ? plainAnswer(q.answer).slice(0, 120) : "No answer yet"}` }));
       }
       if (active) setItems(rows);
     })();

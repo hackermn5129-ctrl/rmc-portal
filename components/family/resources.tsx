@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { classGrades, type Chapter } from "@/lib/chapters";
 import { LETTERS } from "@/lib/mcq";
 import { ChapterHeader, ChapterList, OptionGrid, SubjectGrid, SubjectHeader, Ur, qs, useChapters, useClassSubjects } from "@/components/learn/kit";
-import { AskedBadge, LevelHeading, cardBorder, levelOf, sourcesLine, type Level } from "@/components/learn/asked";
+import { AskedBadge, ExerciseBadge, LevelHeading, OldBookBadge, cardBorder, levelOf, sourcesLine, type Level } from "@/components/learn/asked";
+import { Answer } from "@/components/learn/answer";
 import { BackRow } from "./learn";
 import type { Ctx } from "./shell";
 
@@ -21,7 +22,7 @@ const KINDS: Record<Kind, { label: string; urdu: string; Icon: typeof Library; b
 
 type Ebook = { id: string; grade: number; title: string; url: string; source: string };
 type Paper = { id: string; grade: number; board: string; year: number; syllabus: "old" | "new"; title: string; file_url: string; file_type: "pdf" | "image" };
-type StudyQ = { id: string; chapter_id: string; kind: "short" | "long"; question: string; answer: string; times_asked: number; sources: string[] };
+type StudyQ = { id: string; chapter_id: string; kind: "short" | "long"; question: string; answer: string; times_asked: number; sources: string[]; old_book: boolean; is_exercise: boolean };
 const isPreview = (u: string) => /drive\.google\.com\/file\/d\/[^/]+\/preview/.test(u);
 
 export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId = null }: { ctx: Ctx; subjectId: string | null; kind: Kind | null; chapterId: string | null; bookId: string | null; paperId?: string | null }) {
@@ -73,7 +74,7 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId 
     }
     supabase
       .from("study_questions")
-      .select("id, chapter_id, kind, question, answer, times_asked, sources")
+      .select("id, chapter_id, kind, question, answer, times_asked, sources, old_book, is_exercise")
       .in("chapter_id", ids)
       .order("times_asked", { ascending: false })
       .order("position")
@@ -204,8 +205,10 @@ export function ResourcesHub({ ctx, subjectId, kind, chapterId, bookId, paperId 
 
 function QuestionList({ list }: { list: StudyQ[] }) {
   if (!list.length) return <p className="mt-3 rounded-3xl border border-line bg-white p-4 text-sm text-sub">No questions for this chapter yet. Your teacher will add them.</p>;
-  const sorted = [...list].sort((a, b) => (b.times_asked ?? 1) - (a.times_asked ?? 1));
-  const groups = (["top", "high", "normal"] as Level[]).map((lv) => ({ lv, items: sorted.filter((q) => levelOf(q.times_asked ?? 1) === lv) })).filter((g) => g.items.length);
+  const sorted = [...list].filter((q) => !q.old_book).sort((a, b) => (b.times_asked ?? 0) - (a.times_asked ?? 0));
+  const old = list.filter((q) => q.old_book);
+  const groups: { lv: Level | "old"; items: StudyQ[] }[] = (["top", "high", "normal"] as Level[]).map((lv) => ({ lv, items: sorted.filter((q) => levelOf(q.times_asked ?? 0) === lv) as StudyQ[] })).filter((g) => g.items.length);
+  if (old.length) groups.push({ lv: "old", items: old });
   let n = 0;
   return (
     <>
@@ -214,30 +217,41 @@ function QuestionList({ list }: { list: StudyQ[] }) {
       </p>
       {groups.map((g) => (
         <section key={g.lv}>
-          {groups.length > 1 || g.lv !== "normal" ? <LevelHeading level={g.lv} count={g.items.length} /> : null}
+          {g.lv === "old" ? (
+            <div className="mt-5 flex items-baseline justify-between gap-2">
+              <h3 className="text-[15px] font-semibold text-sub">From old book</h3>
+              <span className="text-[12px] text-sub">Not in the new book · {g.items.length}</span>
+            </div>
+          ) : groups.length > 1 || g.lv !== "normal" ? (
+            <LevelHeading level={g.lv} count={g.items.length} />
+          ) : null}
           <ol className="mt-2 flex flex-col gap-2">
             {g.items.map((q) => {
               n += 1;
-              const times = q.times_asked ?? 1;
+              const times = q.times_asked ?? 0;
               return (
                 <li key={q.id}>
-                  <details className="group rounded-[24px] border border-line bg-white p-4 open:border-line-strong" style={cardBorder(times) ? { borderColor: cardBorder(times), borderWidth: 2 } : undefined}>
+                  <details className="group rounded-[24px] border border-line bg-white p-4 open:border-line-strong" style={!q.old_book && cardBorder(times) ? { borderColor: cardBorder(times), borderWidth: 2 } : undefined}>
                     <summary className="flex cursor-pointer list-none items-start gap-3">
                       <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-bg text-[13px] font-medium tabular-nums text-navy">{n}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-medium">
                           <Ur text={q.question} />
                         </span>
-                        <span className="mt-1.5 block">
-                          <AskedBadge n={times} />
+                        <span className="mt-1.5 flex flex-wrap gap-1.5">
+                          {times > 0 ? <AskedBadge n={times} /> : null}
+                          {q.is_exercise ? <ExerciseBadge /> : null}
+                          {q.old_book ? <OldBookBadge /> : null}
                         </span>
                       </span>
                       <ChevronDown aria-hidden className="mt-1 size-4 shrink-0 text-sub transition-transform group-open:rotate-180" strokeWidth={1.75} />
                     </summary>
-                    {q.answer ? (
-                      <p className="mt-3 whitespace-pre-line border-t border-line pt-3 text-[15px] leading-relaxed text-ink/90">
-                        <Ur text={q.answer} />
-                      </p>
+                    {q.old_book ? (
+                      <p className="mt-3 border-t border-line pt-3 text-sm text-sub">This question is from the old book. It is not in the new course, so no answer is given.</p>
+                    ) : q.answer ? (
+                      <div className="mt-3 border-t border-line pt-3">
+                        <Answer text={q.answer} />
+                      </div>
                     ) : (
                       <p className="mt-3 border-t border-line pt-3 text-sm text-sub">No answer written yet.</p>
                     )}
@@ -253,7 +267,7 @@ function QuestionList({ list }: { list: StudyQ[] }) {
   );
 }
 
-type PQ = { id: string; question: string; options: string[]; correct: number; explanation: string | null; times_asked: number | null; sources: string[] | null };
+type PQ = { id: string; question: string; options: string[]; correct: number; explanation: string | null; times_asked: number | null; sources: string[] | null; is_exercise?: boolean | null };
 
 // One question at a time. Tap an answer to see if it is right.
 function PracticeMcqs({ chapterId }: { chapterId: string }) {
@@ -291,7 +305,8 @@ function PracticeMcqs({ chapterId }: { chapterId: string }) {
       </div>
       <section className="mt-3 rounded-[24px] border border-line bg-white p-4" style={cardBorder(q.times_asked ?? 1) ? { borderColor: cardBorder(q.times_asked ?? 1), borderWidth: 2 } : undefined}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <AskedBadge n={q.times_asked ?? 1} />
+          {(q.times_asked ?? 0) > 0 ? <AskedBadge n={q.times_asked ?? 0} /> : null}
+          {q.is_exercise ? <ExerciseBadge /> : null}
           {levelOf(q.times_asked ?? 1) !== "normal" && (
             <span className="text-[12px] font-medium" style={{ color: levelOf(q.times_asked ?? 1) === "top" ? "#B3261E" : "#8A6100" }}>
               {levelOf(q.times_asked ?? 1) === "top" ? "Most important" : "Important"}

@@ -59,3 +59,21 @@ export function sourcesLine(src: string[] | null | undefined, max = 4) {
   const head = src.slice(0, max).join(" · ");
   return src.length > max ? `${head} · and ${src.length - max} more` : head;
 }
+
+// Question from the textbook's own exercise at the end of the chapter.
+export function ExerciseBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: "#E4ECFA", color: "#2856A8" }} title="From the exercise at the end of the chapter in the book">
+      Exercise
+    </span>
+  );
+}
+
+// Board question from the old syllabus, not in the new book.
+export function OldBookBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: "#EEF1F5", color: "#5F6B7A" }} title="From the old book, not in the new course">
+      From old book
+    </span>
+  );
+}
