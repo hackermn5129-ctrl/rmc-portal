@@ -1,3 +1,10 @@
-u360.html https://www.ustad360.com/?p=4742
-ev-lhr.html https://www.eduvision.edu.pk/exam/bise-lahore-biology-9th-exams-615
-ev-search.html https://www.eduvision.edu.pk/past-papers/9th-biology
+ik-lhr.html https://www.ilmkidunya.com/past_papers/lahore-board-9th-biology.aspx
+ik-guj.html https://www.ilmkidunya.com/past_papers/gujranwala-board-9th-biology.aspx
+ik-mtn.html https://www.ilmkidunya.com/past_papers/multan-board-9th-biology.aspx
+ik-fsd.html https://www.ilmkidunya.com/past_papers/faisalabad-board-9th-biology.aspx
+ik-rwp.html https://www.ilmkidunya.com/past_papers/rawalpindi-board-9th-biology.aspx
+ik-bwp.html https://www.ilmkidunya.com/past_papers/bahawalpur-board-9th-biology.aspx
+ik-dgk.html https://www.ilmkidunya.com/past_papers/dg-khan-board-9th-biology.aspx
+ik-swl.html https://www.ilmkidunya.com/past_papers/sahiwal-board-9th-biology.aspx
+ik-sgd.html https://www.ilmkidunya.com/past_papers/sargodha-board-9th-biology.aspx
+ik-lhr-em.html https://www.ilmkidunya.com/past_papers/lahore-board-9th-biology-english-medium.aspx
