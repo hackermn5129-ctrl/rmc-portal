@@ -14,7 +14,8 @@ function inline(text: string, key = ""): ReactNode[] {
     if (m.index > last) out.push(text.slice(last, m.index));
     if (m[1] !== undefined) {
       out.push(
-        <strong key={`${key}b${i++}`} className="font-semibold" style={{ color: KEY_RED }}>
+        // Labels such as "Ans:" or "Function:" stay dark, so only the key words are red.
+        <strong key={`${key}b${i++}`} className="font-semibold" style={{ color: m[1].trim().endsWith(":") ? "#13233A" : KEY_RED }}>
           {inline(m[1], `${key}b${i}`)}
         </strong>,
       );
