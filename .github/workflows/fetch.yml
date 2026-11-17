@@ -1,0 +1,21 @@
+name: fetch-papers
+on:
+  push:
+    branches: [fetch-papers]
+    paths: [fetch/urls.txt]
+jobs:
+  get:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p out
+          while read -r name url; do
+            [ -z "$name" ] && continue
+            curl -sSL -A "Mozilla/5.0" --max-time 120 -o "out/$name" "$url" || echo "fail $name" >> out/_log.txt
+            echo "$name $(stat -c %s out/$name 2>/dev/null) $(file -b out/$name | cut -c1-40)" >> out/_log.txt
+          done < fetch/urls.txt
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git checkout --orphan papers-cache
+          git rm -rq --cached . ; git add out; git commit -qm cache; git push -f origin papers-cache
